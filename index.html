@@ -94,6 +94,7 @@
 
   /* ---------- Botones genéricos ---------- */
   button{
+    touch-action:manipulation;
     font-family:inherit;
     color:var(--txt);
     background:var(--panel-2);
@@ -143,6 +144,7 @@
 
   /* Tap grande = suma el valor seleccionado */
   .tap{
+    touch-action:manipulation;
     flex:1;
     min-height:0;
     display:flex;
@@ -504,7 +506,7 @@
     if(!a) return;
     if(a.t === "score") st.score[a.team] -= a.v;
     else if(a.t === "foul") st.fouls[a.team] -= a.v;
-    else if(a.t === "period"){ st.period = a.from; st.remaining = a.remaining; }
+    else if(a.t === "period"){ st.period = a.from; st.remaining = a.remaining; st.fouls = a.fouls.slice(); }
     buzz(25);
     save();
     render();
@@ -514,7 +516,7 @@
     var next = st.period + d;
     if(next < 1 || next > st.periods) return;
     stopClock();
-    history.push({t:"period", from:st.period, remaining:st.remaining});
+    history.push({t:"period", from:st.period, remaining:st.remaining, fouls:st.fouls.slice()});
     st.period = next;
     st.remaining = st.minutes * 60;
     // Las faltas de equipo se reinician cada periodo.
@@ -640,14 +642,6 @@
   document.addEventListener("visibilitychange", function(){
     if(document.hidden && timer) stopClock();
   });
-
-  // Evita el zoom por doble toque en iOS sobre las zonas de puntuación.
-  var lastTouch = 0;
-  document.addEventListener("touchend", function(ev){
-    var now = Date.now();
-    if(now - lastTouch < 300) ev.preventDefault();
-    lastTouch = now;
-  }, {passive:false});
 
   render();
 })();
