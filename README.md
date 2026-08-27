@@ -6,11 +6,27 @@ Es una página estática (un solo `index.html`), funciona sin conexión y sin in
 
 Publicada en: **https://bluufloyd-droid.github.io/curly-garbanzo/**
 
-## Cómo usarla
+## Instalarla como aplicación
 
-Abrí la dirección en el celular y usá "Agregar a pantalla de inicio" desde el menú del
-navegador: se abre a pantalla completa como una app y sigue funcionando sin señal.
-También podés abrir el `index.html` directamente en cualquier computadora.
+Es una PWA: se instala desde el navegador, sin tienda de apps, y una vez instalada
+**funciona sin conexión** (un service worker guarda la app en el dispositivo).
+
+- **iPhone / iPad**: abrila en **Safari** (tiene que ser Safari), tocá el botón de
+  compartir y elegí **"Agregar a pantalla de inicio"**.
+- **Android**: abrila en Chrome y tocá **"Instalar aplicación"** en el menú de tres
+  puntos (o el cartel que aparece solo).
+- **Computadora**: en Chrome o Edge, el ícono de instalar aparece a la derecha de la
+  barra de direcciones.
+
+Queda con ícono propio, se abre a pantalla completa sin barra del navegador y arranca
+aunque no haya señal en la cancha. También podés abrir el `index.html` suelto en
+cualquier computadora, sin instalar nada.
+
+### Actualizaciones
+
+La app abre desde lo guardado en el dispositivo y busca la versión nueva en segundo
+plano, así que un cambio publicado se ve al abrirla la **segunda** vez. Al publicar
+cambios hay que subir el número de `CACHE` en `sw.js`.
 
 ## Marcador
 
