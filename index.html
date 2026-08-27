@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0f1115">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Marcador de Básquet</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  :root{
+    --bg:#0f1115;
+    --panel:#171a21;
+    --panel-2:#1e222b;
+    --line:#2a2f3a;
+    --txt:#f2f4f8;
+    --muted:#9aa3b2;
+    --local:#ff8a3d;
+    --visita:#3d9bff;
+    --danger:#ff4d4d;
+    --ok:#2ecc71;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bot: env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    overflow:hidden;
+    user-select:none;
+    -webkit-user-select:none;
+    touch-action:manipulation;
+  }
+  #app{
+    height:100dvh;
+    display:flex;
+    flex-direction:column;
+    padding:calc(var(--safe-top) + 6px) 6px calc(var(--safe-bot) + 6px);
+    gap:6px;
+  }
+
+  /* ---------- Barra superior: periodo y reloj ---------- */
+  .topbar{
+    display:flex;
+    align-items:stretch;
+    gap:6px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:6px;
+  }
+  .period{
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .period .label{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--muted);
+  }
+  .period .value{
+    font-size:22px;
+    font-weight:800;
+    min-width:2.2ch;
+    text-align:center;
+    font-variant-numeric:tabular-nums;
+  }
+  .clock{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+  }
+  #clock{
+    font-size:clamp(26px,7vw,40px);
+    font-weight:800;
+    font-variant-numeric:tabular-nums;
+    letter-spacing:.02em;
+    padding:2px 10px;
+    border-radius:10px;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+  }
+  #clock.running{color:var(--ok);border-color:rgba(46,204,113,.45)}
+  #clock.ended{color:var(--danger);border-color:rgba(255,77,77,.5)}
+
+  /* ---------- Botones genéricos ---------- */
+  button{
+    font-family:inherit;
+    color:var(--txt);
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:12px;
+    font-weight:700;
+    cursor:pointer;
+    transition:transform .06s ease, filter .12s ease;
+  }
+  button:active{transform:scale(.94);filter:brightness(1.25)}
+  .mini{
+    padding:8px 10px;
+    font-size:13px;
+    min-width:40px;
+  }
+
+  /* ---------- Zona de equipos ---------- */
+  .court{
+    flex:1;
+    display:flex;
+    gap:6px;
+    min-height:0;
+  }
+  .team{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+    min-width:0;
+  }
+  .name{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:8px 6px;
+    text-align:center;
+    font-size:14px;
+    font-weight:800;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .team.local .name{color:var(--local)}
+  .team.visita .name{color:var(--visita)}
+
+  /* Tap grande = suma el valor seleccionado */
+  .tap{
+    flex:1;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:2px;
+    background:var(--panel);
+    border:2px solid var(--line);
+    border-radius:18px;
+    position:relative;
+    overflow:hidden;
+  }
+  .team.local .tap{border-color:rgba(255,138,61,.35)}
+  .team.visita .tap{border-color:rgba(61,155,255,.35)}
+  .score{
+    font-size:clamp(48px,min(27vw,22dvh),190px);
+    font-weight:900;
+    line-height:.9;
+    font-variant-numeric:tabular-nums;
+  }
+  .hint{
+    font-size:11px;
+    color:var(--muted);
+    letter-spacing:.06em;
+    text-transform:uppercase;
+  }
+  .flash{
+    position:absolute;
+    inset:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:clamp(36px,min(18vw,16dvh),130px);
+    font-weight:900;
+    pointer-events:none;
+    opacity:0;
+  }
+  .team.local .flash{color:var(--local)}
+  .team.visita .flash{color:var(--visita)}
+  .flash.go{animation:pop .55s ease-out}
+  @keyframes pop{
+    0%{opacity:1;transform:scale(.6)}
+    60%{opacity:.9;transform:scale(1.15)}
+    100%{opacity:0;transform:scale(1.5)}
+  }
+
+  .pts{display:flex;gap:6px}
+  .pts button{
+    flex:1;
+    padding:14px 0;
+    font-size:18px;
+    font-weight:800;
+  }
+  .team.local .pts button{background:rgba(255,138,61,.14);border-color:rgba(255,138,61,.35)}
+  .team.visita .pts button{background:rgba(61,155,255,.14);border-color:rgba(61,155,255,.35)}
+  .team .pts button.minus{background:var(--panel-2);border-color:var(--line);color:var(--muted);flex:.6}
+
+  .stats{
+    display:flex;
+    gap:6px;
+    align-items:center;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:6px;
+  }
+  .stats .cell{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:4px;
+  }
+  .stats .k{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .stats .v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+  .stats .v.warn{color:var(--danger)}
+
+  /* ---------- Barra inferior ---------- */
+  .bottombar{
+    display:flex;
+    gap:6px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:6px;
+  }
+  .bottombar button{flex:1;padding:12px 4px;font-size:13px}
+  #undo:disabled{opacity:.35}
+  .sel{
+    display:flex;
+    gap:4px;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:4px;
+  }
+  .sel button{
+    background:transparent;
+    border:none;
+    padding:8px 10px;
+    font-size:14px;
+    color:var(--muted);
+    border-radius:9px;
+  }
+  .sel button.on{background:#333a48;color:var(--txt)}
+
+  /* ---------- Modal ---------- */
+  dialog{
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--txt);
+    border-radius:16px;
+    padding:18px;
+    width:min(92vw,380px);
+  }
+  dialog::backdrop{background:rgba(0,0,0,.65)}
+  dialog h2{margin:0 0 12px;font-size:17px}
+  .field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+  .field label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .field input{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--txt);
+    border-radius:10px;
+    padding:11px;
+    font-size:15px;
+    font-family:inherit;
+  }
+  .row{display:flex;gap:8px}
+  .row>*{flex:1}
+  dialog .actions{display:flex;gap:8px;margin-top:14px}
+  dialog .actions button{flex:1;padding:12px}
+  .primary{background:#2f6fed;border-color:#2f6fed}
+  .danger{background:rgba(255,77,77,.16);border-color:rgba(255,77,77,.45);color:#ff9b9b}
+
+  @media (orientation:landscape) and (max-height:480px){
+    .name{padding:4px;font-size:12px}
+    .pts button{padding:10px 0;font-size:16px}
+    .bottombar button{padding:9px 4px}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div class="topbar">
+    <div class="period">
+      <button class="mini" id="perMinus" aria-label="Periodo anterior">−</button>
+      <div>
+        <div class="label">Periodo</div>
+        <div class="value" id="period">1</div>
+      </div>
+      <button class="mini" id="perPlus" aria-label="Periodo siguiente">+</button>
+    </div>
+    <div class="clock">
+      <div id="clock" role="timer">10:00</div>
+      <button class="mini" id="clockToggle">▶</button>
+      <button class="mini" id="clockReset">↺</button>
+    </div>
+  </div>
+
+  <div class="court">
+    <section class="team local" data-team="0">
+      <div class="name" id="name0">LOCAL</div>
+      <div class="tap" data-tap="0">
+        <div class="score" id="score0">0</div>
+        <div class="hint">toca para +<span class="quick">2</span></div>
+        <div class="flash" id="flash0"></div>
+      </div>
+      <div class="pts">
+        <button data-add="0" data-v="1">+1</button>
+        <button data-add="0" data-v="2">+2</button>
+        <button data-add="0" data-v="3">+3</button>
+        <button class="minus" data-add="0" data-v="-1">−1</button>
+      </div>
+      <div class="stats">
+        <div class="cell"><span class="k">Faltas</span><span class="v" id="foul0">0</span></div>
+        <button class="mini" data-foul="0" data-d="1">+</button>
+        <button class="mini" data-foul="0" data-d="-1">−</button>
+      </div>
+    </section>
+
+    <section class="team visita" data-team="1">
+      <div class="name" id="name1">VISITA</div>
+      <div class="tap" data-tap="1">
+        <div class="score" id="score1">0</div>
+        <div class="hint">toca para +<span class="quick">2</span></div>
+        <div class="flash" id="flash1"></div>
+      </div>
+      <div class="pts">
+        <button data-add="1" data-v="1">+1</button>
+        <button data-add="1" data-v="2">+2</button>
+        <button data-add="1" data-v="3">+3</button>
+        <button class="minus" data-add="1" data-v="-1">−1</button>
+      </div>
+      <div class="stats">
+        <div class="cell"><span class="k">Faltas</span><span class="v" id="foul1">0</span></div>
+        <button class="mini" data-foul="1" data-d="1">+</button>
+        <button class="mini" data-foul="1" data-d="-1">−</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="bottombar">
+    <div class="sel" id="quickSel" title="Puntos al tocar la pantalla">
+      <button data-quick="1">1</button>
+      <button data-quick="2" class="on">2</button>
+      <button data-quick="3">3</button>
+    </div>
+    <button id="undo" disabled>↶ Deshacer</button>
+    <button id="settings">⚙ Ajustes</button>
+    <button id="reset" class="danger">Nuevo</button>
+  </div>
+</div>
+
+<dialog id="dlg">
+  <h2>Ajustes del partido</h2>
+  <div class="row">
+    <div class="field">
+      <label for="in0">Equipo local</label>
+      <input id="in0" maxlength="14" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="in1">Equipo visita</label>
+      <input id="in1" maxlength="14" autocomplete="off">
+    </div>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label for="inMin">Minutos por periodo</label>
+      <input id="inMin" type="number" min="1" max="60" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label for="inPer">Periodos</label>
+      <input id="inPer" type="number" min="1" max="8" inputmode="numeric">
+    </div>
+  </div>
+  <div class="actions">
+    <button id="dlgCancel">Cancelar</button>
+    <button id="dlgSave" class="primary">Guardar</button>
+  </div>
+</dialog>
+
+<script>
+(function(){
+  "use strict";
+
+  var KEY = "basket-marcador-v1";
+  var DEF = {
+    names:["LOCAL","VISITA"],
+    score:[0,0],
+    fouls:[0,0],
+    period:1,
+    periods:4,
+    minutes:10,
+    remaining:600,   // segundos restantes del periodo
+    quick:2
+  };
+
+  var st = load();
+  var history = [];      // pila de acciones para deshacer
+  var timer = null;      // id de setInterval
+  var endsAt = 0;        // timestamp de fin cuando el reloj corre
+
+  var $ = function(id){ return document.getElementById(id); };
+
+  function load(){
+    try{
+      var raw = localStorage.getItem(KEY);
+      if(!raw) return Object.assign({}, DEF);
+      var s = JSON.parse(raw);
+      return Object.assign({}, DEF, s, {
+        names: (s.names || DEF.names).slice(0,2),
+        score: (s.score || DEF.score).slice(0,2),
+        fouls: (s.fouls || DEF.fouls).slice(0,2)
+      });
+    }catch(e){
+      return Object.assign({}, DEF);
+    }
+  }
+
+  function save(){
+    try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){}
+  }
+
+  function buzz(ms){
+    if(navigator.vibrate) { try{ navigator.vibrate(ms); }catch(e){} }
+  }
+
+  function fmt(sec){
+    sec = Math.max(0, Math.ceil(sec));
+    var m = Math.floor(sec/60), s = sec%60;
+    return m + ":" + (s<10 ? "0"+s : s);
+  }
+
+  /* ---------- Render ---------- */
+  function render(){
+    $("name0").textContent = st.names[0];
+    $("name1").textContent = st.names[1];
+    $("score0").textContent = st.score[0];
+    $("score1").textContent = st.score[1];
+    $("foul0").textContent = st.fouls[0];
+    $("foul1").textContent = st.fouls[1];
+    $("foul0").classList.toggle("warn", st.fouls[0] >= 5);
+    $("foul1").classList.toggle("warn", st.fouls[1] >= 5);
+    $("period").textContent = st.period;
+
+    var qs = document.querySelectorAll(".quick");
+    for(var i=0;i<qs.length;i++) qs[i].textContent = st.quick;
+    var sel = document.querySelectorAll("#quickSel button");
+    for(var j=0;j<sel.length;j++){
+      sel[j].classList.toggle("on", Number(sel[j].dataset.quick) === st.quick);
+    }
+
+    renderClock();
+    $("undo").disabled = history.length === 0;
+  }
+
+  function renderClock(){
+    var c = $("clock");
+    c.textContent = fmt(st.remaining);
+    c.classList.toggle("running", timer !== null);
+    c.classList.toggle("ended", st.remaining <= 0);
+    $("clockToggle").textContent = timer ? "⏸" : "▶";
+  }
+
+  function flash(team, txt){
+    var el = $("flash"+team);
+    el.textContent = txt;
+    el.classList.remove("go");
+    void el.offsetWidth;   // reinicia la animación
+    el.classList.add("go");
+  }
+
+  /* ---------- Acciones ---------- */
+  function addPoints(team, v){
+    if(v > 0 && st.score[team] >= 999) return;
+    if(v < 0 && st.score[team] <= 0) return;
+    st.score[team] += v;
+    history.push({t:"score", team:team, v:v});
+    flash(team, (v>0?"+":"") + v);
+    buzz(v>0 ? 18 : 8);
+    save();
+    render();
+  }
+
+  function addFoul(team, d){
+    if(st.fouls[team] + d < 0) return;
+    st.fouls[team] += d;
+    history.push({t:"foul", team:team, v:d});
+    buzz(10);
+    save();
+    render();
+  }
+
+  function undo(){
+    var a = history.pop();
+    if(!a) return;
+    if(a.t === "score") st.score[a.team] -= a.v;
+    else if(a.t === "foul") st.fouls[a.team] -= a.v;
+    else if(a.t === "period"){ st.period = a.from; st.remaining = a.remaining; }
+    buzz(25);
+    save();
+    render();
+  }
+
+  function changePeriod(d){
+    var next = st.period + d;
+    if(next < 1 || next > st.periods) return;
+    stopClock();
+    history.push({t:"period", from:st.period, remaining:st.remaining});
+    st.period = next;
+    st.remaining = st.minutes * 60;
+    // Las faltas de equipo se reinician cada periodo.
+    st.fouls = [0,0];
+    save();
+    render();
+  }
+
+  /* ---------- Reloj ---------- */
+  function startClock(){
+    if(timer || st.remaining <= 0) return;
+    endsAt = Date.now() + st.remaining * 1000;
+    timer = setInterval(tick, 200);
+    renderClock();
+  }
+
+  function stopClock(){
+    if(!timer) return;
+    clearInterval(timer);
+    timer = null;
+    st.remaining = Math.max(0, (endsAt - Date.now()) / 1000);
+    save();
+    renderClock();
+  }
+
+  function tick(){
+    st.remaining = Math.max(0, (endsAt - Date.now()) / 1000);
+    if(st.remaining <= 0){
+      clearInterval(timer);
+      timer = null;
+      st.remaining = 0;
+      buzz([220,120,220]);
+      save();
+    }
+    renderClock();
+  }
+
+  function resetClock(){
+    stopClock();
+    st.remaining = st.minutes * 60;
+    save();
+    render();
+  }
+
+  /* ---------- Eventos ---------- */
+  document.addEventListener("click", function(ev){
+    var el = ev.target.closest("[data-tap],[data-add],[data-foul],[data-quick]");
+    if(!el) return;
+
+    if(el.hasAttribute("data-add")){
+      addPoints(Number(el.dataset.add), Number(el.dataset.v));
+    }else if(el.hasAttribute("data-foul")){
+      addFoul(Number(el.dataset.foul), Number(el.dataset.d));
+    }else if(el.hasAttribute("data-quick")){
+      st.quick = Number(el.dataset.quick);
+      buzz(8);
+      save();
+      render();
+    }else if(el.hasAttribute("data-tap")){
+      addPoints(Number(el.dataset.tap), st.quick);
+    }
+  });
+
+  $("perPlus").addEventListener("click", function(){ changePeriod(1); });
+  $("perMinus").addEventListener("click", function(){ changePeriod(-1); });
+  $("clockToggle").addEventListener("click", function(){ timer ? stopClock() : startClock(); });
+  $("clockReset").addEventListener("click", resetClock);
+  $("undo").addEventListener("click", undo);
+
+  $("reset").addEventListener("click", function(){
+    if(!confirm("¿Empezar un partido nuevo? Se borra el marcador.")) return;
+    stopClock();
+    st.score = [0,0];
+    st.fouls = [0,0];
+    st.period = 1;
+    st.remaining = st.minutes * 60;
+    history = [];
+    save();
+    render();
+  });
+
+  var dlg = $("dlg");
+  $("settings").addEventListener("click", function(){
+    $("in0").value = st.names[0];
+    $("in1").value = st.names[1];
+    $("inMin").value = st.minutes;
+    $("inPer").value = st.periods;
+    dlg.showModal();
+  });
+  $("dlgCancel").addEventListener("click", function(){ dlg.close(); });
+  $("dlgSave").addEventListener("click", function(){
+    var n0 = $("in0").value.trim() || "LOCAL";
+    var n1 = $("in1").value.trim() || "VISITA";
+    var min = Math.min(60, Math.max(1, Number($("inMin").value) || st.minutes));
+    var per = Math.min(8, Math.max(1, Number($("inPer").value) || st.periods));
+    var minChanged = min !== st.minutes;
+
+    st.names = [n0.toUpperCase(), n1.toUpperCase()];
+    st.minutes = min;
+    st.periods = per;
+    if(st.period > per) st.period = per;
+    if(minChanged){
+      stopClock();
+      st.remaining = min * 60;
+    }
+    save();
+    render();
+    dlg.close();
+  });
+
+  // Teclado, útil si se usa en una laptop: A/L suman, espacio arranca el reloj.
+  document.addEventListener("keydown", function(ev){
+    if(dlg.open) return;
+    var k = ev.key.toLowerCase();
+    if(k === "a") addPoints(0, st.quick);
+    else if(k === "l") addPoints(1, st.quick);
+    else if(k === " "){ ev.preventDefault(); timer ? stopClock() : startClock(); }
+    else if(k === "z") undo();
+    else if(k === "1" || k === "2" || k === "3"){ st.quick = Number(k); save(); render(); }
+  });
+
+  // El reloj se pausa si la pestaña se oculta, para no perder segundos reales.
+  document.addEventListener("visibilitychange", function(){
+    if(document.hidden && timer) stopClock();
+  });
+
+  // Evita el zoom por doble toque en iOS sobre las zonas de puntuación.
+  var lastTouch = 0;
+  document.addEventListener("touchend", function(ev){
+    var now = Date.now();
+    if(now - lastTouch < 300) ev.preventDefault();
+    lastTouch = now;
+  }, {passive:false});
+
+  render();
+})();
+</script>
+</body>
+</html>
