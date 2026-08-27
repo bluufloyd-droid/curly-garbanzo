@@ -34,7 +34,6 @@
     overflow:hidden;
     user-select:none;
     -webkit-user-select:none;
-    touch-action:manipulation;
   }
   #app{
     height:100dvh;
@@ -44,56 +43,35 @@
     gap:6px;
   }
 
-  /* ---------- Barra superior: periodo y reloj ---------- */
+  /* ---------- Barra superior ---------- */
   .topbar{
     display:flex;
-    align-items:stretch;
+    align-items:center;
     gap:6px;
     background:var(--panel);
     border:1px solid var(--line);
     border-radius:14px;
     padding:6px;
   }
-  .period{
-    display:flex;
-    align-items:center;
-    gap:6px;
-  }
-  .period .label{
-    font-size:11px;
-    text-transform:uppercase;
-    letter-spacing:.08em;
-    color:var(--muted);
-  }
-  .period .value{
-    font-size:22px;
-    font-weight:800;
-    min-width:2.2ch;
-    text-align:center;
-    font-variant-numeric:tabular-nums;
-  }
-  .clock{
-    flex:1;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    gap:10px;
-  }
+  .period{display:flex;align-items:center;gap:6px}
+  .period .label{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+  .period .value{font-size:20px;font-weight:800;min-width:2.2ch;text-align:center;font-variant-numeric:tabular-nums}
+  .clock{flex:1;display:flex;align-items:center;justify-content:center;gap:8px}
   #clock{
-    font-size:clamp(26px,7vw,40px);
+    font-size:clamp(24px,6.5vw,38px);
     font-weight:800;
     font-variant-numeric:tabular-nums;
-    letter-spacing:.02em;
-    padding:2px 10px;
+    padding:4px 12px;
     border-radius:10px;
     background:var(--panel-2);
     border:1px solid var(--line);
+    color:var(--txt);
   }
   #clock.running{color:var(--ok);border-color:rgba(46,204,113,.45)}
   #clock.ended{color:var(--danger);border-color:rgba(255,77,77,.5)}
 
-  /* ---------- Botones genéricos ---------- */
   button{
+    touch-action:manipulation;
     font-family:inherit;
     color:var(--txt);
     background:var(--panel-2);
@@ -104,33 +82,18 @@
     transition:transform .06s ease, filter .12s ease;
   }
   button:active{transform:scale(.94);filter:brightness(1.25)}
-  .mini{
-    padding:8px 10px;
-    font-size:13px;
-    min-width:40px;
-  }
+  .mini{padding:8px 10px;font-size:13px;min-width:40px}
 
-  /* ---------- Zona de equipos ---------- */
-  .court{
-    flex:1;
-    display:flex;
-    gap:6px;
-    min-height:0;
-  }
-  .team{
-    flex:1;
-    display:flex;
-    flex-direction:column;
-    gap:6px;
-    min-width:0;
-  }
+  /* ---------- Equipos ---------- */
+  .court{flex:1;display:flex;gap:6px;min-height:0}
+  .team{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
   .name{
     background:var(--panel);
     border:1px solid var(--line);
     border-radius:12px;
-    padding:8px 6px;
+    padding:7px 6px;
     text-align:center;
-    font-size:14px;
+    font-size:13px;
     font-weight:800;
     letter-spacing:.06em;
     text-transform:uppercase;
@@ -140,9 +103,8 @@
   }
   .team.local .name{color:var(--local)}
   .team.visita .name{color:var(--visita)}
-
-  /* Tap grande = suma el valor seleccionado */
   .tap{
+    touch-action:manipulation;
     flex:1;
     min-height:0;
     display:flex;
@@ -158,28 +120,11 @@
   }
   .team.local .tap{border-color:rgba(255,138,61,.35)}
   .team.visita .tap{border-color:rgba(61,155,255,.35)}
-  .score{
-    font-size:clamp(48px,min(27vw,22dvh),190px);
-    font-weight:900;
-    line-height:.9;
-    font-variant-numeric:tabular-nums;
-  }
-  .hint{
-    font-size:11px;
-    color:var(--muted);
-    letter-spacing:.06em;
-    text-transform:uppercase;
-  }
+  .score{font-size:clamp(48px,min(24vw,19dvh),170px);font-weight:900;line-height:.9;font-variant-numeric:tabular-nums}
+  .hint{font-size:10px;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;text-align:center;padding:0 4px}
   .flash{
-    position:absolute;
-    inset:0;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-size:clamp(36px,min(18vw,16dvh),130px);
-    font-weight:900;
-    pointer-events:none;
-    opacity:0;
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:clamp(34px,min(16vw,14dvh),120px);font-weight:900;pointer-events:none;opacity:0;
   }
   .team.local .flash{color:var(--local)}
   .team.visita .flash{color:var(--visita)}
@@ -189,100 +134,158 @@
     60%{opacity:.9;transform:scale(1.15)}
     100%{opacity:0;transform:scale(1.5)}
   }
-
-  .pts{display:flex;gap:6px}
-  .pts button{
-    flex:1;
-    padding:14px 0;
-    font-size:18px;
-    font-weight:800;
-  }
+  .pts{display:flex;gap:5px}
+  .pts button{flex:1;padding:13px 0;font-size:17px;font-weight:800}
   .team.local .pts button{background:rgba(255,138,61,.14);border-color:rgba(255,138,61,.35)}
   .team.visita .pts button{background:rgba(61,155,255,.14);border-color:rgba(61,155,255,.35)}
-  .team .pts button.minus{background:var(--panel-2);border-color:var(--line);color:var(--muted);flex:.6}
-
-  .stats{
-    display:flex;
-    gap:6px;
-    align-items:center;
-    background:var(--panel);
-    border:1px solid var(--line);
-    border-radius:12px;
-    padding:6px;
+  .pts button.minus{background:var(--panel-2);border-color:var(--line);color:var(--muted);flex:.55}
+  .infra{display:flex;gap:5px}
+  .infra button{flex:1;padding:11px 0;font-size:13px;background:var(--panel-2)}
+  .infra button.tec{flex:.8;color:var(--muted)}
+  .teamfouls{
+    display:flex;align-items:center;justify-content:center;gap:6px;
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:5px;
+    font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;
   }
-  .stats .cell{
-    flex:1;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:4px;
-  }
-  .stats .k{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-  .stats .v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
-  .stats .v.warn{color:var(--danger)}
+  .teamfouls b{font-size:15px;color:var(--txt);font-variant-numeric:tabular-nums}
+  .teamfouls.bonus b{color:var(--danger)}
+  .teamfouls.bonus{border-color:rgba(255,77,77,.45)}
 
   /* ---------- Barra inferior ---------- */
-  .bottombar{
-    display:flex;
-    gap:6px;
-    background:var(--panel);
-    border:1px solid var(--line);
-    border-radius:14px;
-    padding:6px;
-  }
+  .bottombar{display:flex;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:6px}
   .bottombar button{flex:1;padding:12px 4px;font-size:13px}
   #undo:disabled{opacity:.35}
-  .sel{
-    display:flex;
-    gap:4px;
-    background:var(--panel-2);
-    border:1px solid var(--line);
-    border-radius:12px;
-    padding:4px;
-  }
-  .sel button{
-    background:transparent;
-    border:none;
-    padding:8px 10px;
-    font-size:14px;
-    color:var(--muted);
-    border-radius:9px;
-  }
+  .sel{display:flex;gap:4px;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:4px}
+  .sel button{background:transparent;border:none;padding:8px 10px;font-size:14px;color:var(--muted);border-radius:9px;min-width:34px}
   .sel button.on{background:#333a48;color:var(--txt)}
 
-  /* ---------- Modal ---------- */
+  /* ---------- Diálogos y hojas ---------- */
   dialog{
     border:1px solid var(--line);
     background:var(--panel);
     color:var(--txt);
-    border-radius:16px;
-    padding:18px;
-    width:min(92vw,380px);
+    padding:0;
+    margin:auto;
+    max-height:92dvh;
   }
-  dialog::backdrop{background:rgba(0,0,0,.65)}
-  dialog h2{margin:0 0 12px;font-size:17px}
+  dialog::backdrop{background:rgba(0,0,0,.7)}
+  dialog.sheet{
+    border-radius:18px 18px 0 0;
+    border-bottom:none;
+    width:100%;
+    max-width:640px;
+    margin:auto auto 0;
+    padding-bottom:var(--safe-bot);
+  }
+  dialog.panel{
+    border-radius:16px;
+    width:min(94vw,560px);
+  }
+  .dhead{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:14px 16px 10px;
+    border-bottom:1px solid var(--line);
+    position:sticky;top:0;background:var(--panel);border-radius:inherit;
+  }
+  .dhead h2{margin:0;font-size:16px;font-weight:800}
+  .dhead .sub{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+  .dbody{padding:14px 16px;overflow:auto;max-height:70dvh}
+  .dfoot{display:flex;gap:8px;padding:10px 16px 14px}
+  .dfoot button{flex:1;padding:13px}
+  .primary{background:#2f6fed;border-color:#2f6fed}
+  .danger{background:rgba(255,77,77,.16);border-color:rgba(255,77,77,.45);color:#ff9b9b}
+  .x{padding:7px 12px;font-size:16px;line-height:1}
+
+  /* Selector de jugador */
+  .who{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+  .who button{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    padding:14px 6px;min-height:74px;
+  }
+  .who button .num{font-size:26px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1}
+  .who button .nm{
+    font-size:10px;color:var(--muted);font-weight:600;max-width:100%;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-transform:uppercase;
+  }
+  .who button.out{opacity:.55}
+  .who button .pf{font-size:9px;color:var(--danger);font-weight:700}
+  .groupTitle{
+    font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;
+    margin:16px 0 8px;font-weight:700;
+  }
+  .groupTitle:first-child{margin-top:0}
+  .empty{color:var(--muted);font-size:13px;line-height:1.5;text-align:center;padding:10px 0}
+
+  /* Planilla */
+  .rosterRow{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+  .rosterRow input{
+    background:var(--panel-2);border:1px solid var(--line);color:var(--txt);
+    border-radius:9px;padding:10px;font-size:15px;font-family:inherit;min-width:0;
+  }
+  .rosterRow .n{width:64px;text-align:center;font-weight:800;font-variant-numeric:tabular-nums}
+  .rosterRow .nm{flex:1}
+  .rosterRow .del{padding:9px 11px;color:var(--muted);background:transparent;border-color:transparent;font-size:16px}
+  .tabs{display:flex;gap:6px;margin-bottom:12px}
+  .tabs button{flex:1;padding:10px;font-size:13px;background:var(--panel-2)}
+  .tabs button.on{background:#333a48;border-color:#4a5468}
+  .tabs button.on[data-t="0"]{color:var(--local)}
+  .tabs button.on[data-t="1"]{color:var(--visita)}
+  .note{font-size:11px;color:var(--muted);line-height:1.5;margin:10px 0 0}
+
+  /* Cambios */
+  .subsGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px}
+  .subsGrid button{display:flex;align-items:center;gap:8px;padding:11px 10px;text-align:left}
+  .subsGrid button .num{font-size:19px;font-weight:900;font-variant-numeric:tabular-nums;min-width:2ch}
+  .subsGrid button .meta{font-size:9px;color:var(--muted);font-weight:600;line-height:1.3;min-width:0;white-space:normal;overflow:hidden}
+  .subsGrid button.oncourt{background:rgba(46,204,113,.14);border-color:rgba(46,204,113,.45)}
+  .counter{font-size:12px;color:var(--muted);margin-bottom:10px}
+  .counter b{color:var(--txt)}
+  .counter.full b{color:var(--ok)}
+
+  /* Estadísticas */
+  table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
+  th,td{padding:7px 3px;text-align:right;border-bottom:1px solid var(--line)}
+  th:nth-child(1),td:nth-child(1){text-align:center;width:34px;font-weight:800;font-variant-numeric:tabular-nums}
+  /* El nombre se queda con el espacio que sobra; las columnas de números van fijas. */
+  th:nth-child(2),td:nth-child(2){text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  th:nth-child(3),td:nth-child(3){width:42px}
+  th:nth-child(4),td:nth-child(4){width:32px}
+  th:nth-child(5),td:nth-child(5){width:32px}
+  th:nth-child(6),td:nth-child(6){width:54px}
+  th{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+  td{font-variant-numeric:tabular-nums}
+  tr.on td:nth-child(1){color:var(--ok)}
+  td.foulOut{color:var(--danger);font-weight:800}
+  tfoot td{font-weight:800;border-bottom:none;border-top:2px solid var(--line)}
+
+  /* Corregir tiempo */
+  .timeEdit{display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:14px}
+  .timeEdit input{
+    width:78px;background:var(--panel-2);border:1px solid var(--line);color:var(--txt);
+    border-radius:10px;padding:12px 6px;font-size:26px;font-weight:800;text-align:center;
+    font-variant-numeric:tabular-nums;font-family:inherit;
+  }
+  .timeEdit span{font-size:24px;font-weight:800;color:var(--muted)}
+  .quickTime{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .quickTime button{padding:11px 0;font-size:13px}
+
   .field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
-  .field label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .field label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
   .field input{
-    background:var(--panel-2);
-    border:1px solid var(--line);
-    color:var(--txt);
-    border-radius:10px;
-    padding:11px;
-    font-size:15px;
-    font-family:inherit;
+    background:var(--panel-2);border:1px solid var(--line);color:var(--txt);
+    border-radius:10px;padding:11px;font-size:15px;font-family:inherit;
   }
   .row{display:flex;gap:8px}
   .row>*{flex:1}
-  dialog .actions{display:flex;gap:8px;margin-top:14px}
-  dialog .actions button{flex:1;padding:12px}
-  .primary{background:#2f6fed;border-color:#2f6fed}
-  .danger{background:rgba(255,77,77,.16);border-color:rgba(255,77,77,.45);color:#ff9b9b}
+  .menuList{display:flex;flex-direction:column;gap:8px}
+  .menuList button{padding:15px;font-size:15px;text-align:left}
 
-  @media (orientation:landscape) and (max-height:480px){
+  @media (orientation:landscape) and (max-height:500px){
     .name{padding:4px;font-size:12px}
-    .pts button{padding:10px 0;font-size:16px}
+    .pts button{padding:9px 0;font-size:15px}
+    .infra button{padding:8px 0;font-size:12px}
     .bottombar button{padding:9px 4px}
+    .teamfouls{padding:3px;font-size:10px}
   }
 </style>
 </head>
@@ -293,15 +296,14 @@
     <div class="period">
       <button class="mini" id="perMinus" aria-label="Periodo anterior">−</button>
       <div>
-        <div class="label">Periodo</div>
+        <div class="label">Per</div>
         <div class="value" id="period">1</div>
       </div>
       <button class="mini" id="perPlus" aria-label="Periodo siguiente">+</button>
     </div>
     <div class="clock">
-      <div id="clock" role="timer">10:00</div>
+      <button id="clock" title="Tocá para corregir el tiempo">10:00</button>
       <button class="mini" id="clockToggle">▶</button>
-      <button class="mini" id="clockReset">↺</button>
     </div>
   </div>
 
@@ -319,11 +321,11 @@
         <button data-add="0" data-v="3">+3</button>
         <button class="minus" data-add="0" data-v="-1">−1</button>
       </div>
-      <div class="stats">
-        <div class="cell"><span class="k">Faltas</span><span class="v" id="foul0">0</span></div>
-        <button class="mini" data-foul="0" data-d="1">+</button>
-        <button class="mini" data-foul="0" data-d="-1">−</button>
+      <div class="infra">
+        <button data-foul="0">Falta</button>
+        <button class="tec" data-tech="0">Técnica</button>
       </div>
+      <div class="teamfouls" id="tf0">Faltas equipo <b>0</b></div>
     </section>
 
     <section class="team visita" data-team="1">
@@ -339,51 +341,180 @@
         <button data-add="1" data-v="3">+3</button>
         <button class="minus" data-add="1" data-v="-1">−1</button>
       </div>
-      <div class="stats">
-        <div class="cell"><span class="k">Faltas</span><span class="v" id="foul1">0</span></div>
-        <button class="mini" data-foul="1" data-d="1">+</button>
-        <button class="mini" data-foul="1" data-d="-1">−</button>
+      <div class="infra">
+        <button data-foul="1">Falta</button>
+        <button class="tec" data-tech="1">Técnica</button>
       </div>
+      <div class="teamfouls" id="tf1">Faltas equipo <b>0</b></div>
     </section>
   </div>
 
   <div class="bottombar">
-    <div class="sel" id="quickSel" title="Puntos al tocar la pantalla">
+    <div class="sel" id="quickSel" title="Puntos que suma cada toque en pantalla">
       <button data-quick="1">1</button>
       <button data-quick="2" class="on">2</button>
       <button data-quick="3">3</button>
     </div>
     <button id="undo" disabled>↶ Deshacer</button>
-    <button id="settings">⚙ Ajustes</button>
-    <button id="reset" class="danger">Nuevo</button>
+    <button id="menu">☰ Menú</button>
   </div>
 </div>
 
-<dialog id="dlg">
-  <h2>Ajustes del partido</h2>
-  <div class="row">
-    <div class="field">
-      <label for="in0">Equipo local</label>
-      <input id="in0" maxlength="14" autocomplete="off">
+<!-- Selector de jugador: aparece al sumar puntos o cargar una falta -->
+<dialog id="dlgWho" class="sheet">
+  <div class="dhead">
+    <div>
+      <h2 id="whoTitle">¿Quién?</h2>
+      <div class="sub" id="whoSub"></div>
     </div>
-    <div class="field">
-      <label for="in1">Equipo visita</label>
-      <input id="in1" maxlength="14" autocomplete="off">
+    <button class="x" id="whoClose" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="dbody" id="whoBody"></div>
+  <div class="dfoot">
+    <button id="whoSkip">Sin asignar</button>
+  </div>
+</dialog>
+
+<!-- Menú -->
+<dialog id="dlgMenu" class="sheet">
+  <div class="dhead">
+    <h2>Menú</h2>
+    <button class="x" data-close="dlgMenu" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="dbody">
+    <div class="menuList">
+      <button id="mRoster">📋 Planilla de jugadores</button>
+      <button id="mSubs">🔄 Cambios / quién está en cancha</button>
+      <button id="mStats">📊 Estadísticas del partido</button>
+      <button id="mSettings">⚙️ Ajustes del partido</button>
+      <button id="mReset" class="danger">🗑️ Partido nuevo</button>
     </div>
   </div>
-  <div class="row">
-    <div class="field">
-      <label for="inMin">Minutos por periodo</label>
-      <input id="inMin" type="number" min="1" max="60" inputmode="numeric">
+</dialog>
+
+<!-- Planilla -->
+<dialog id="dlgRoster" class="panel">
+  <div class="dhead">
+    <div>
+      <h2>Planilla</h2>
+      <div class="sub">Hasta 15 jugadores por equipo</div>
     </div>
-    <div class="field">
-      <label for="inPer">Periodos</label>
-      <input id="inPer" type="number" min="1" max="8" inputmode="numeric">
+    <button class="x" data-close="dlgRoster" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="dbody">
+    <div class="tabs" id="rosterTabs">
+      <button data-t="0" class="on">LOCAL</button>
+      <button data-t="1">VISITA</button>
+    </div>
+    <div id="rosterList"></div>
+    <button id="rosterAdd" style="width:100%;padding:12px;margin-top:8px">+ Agregar jugador</button>
+    <p class="note">El número es lo que se muestra al asignar puntos y faltas; el nombre es opcional.
+    Para elegir los 5 que arrancan en cancha usá <b>Cambios</b>.</p>
+  </div>
+  <div class="dfoot">
+    <button id="rosterSave" class="primary">Guardar planilla</button>
+  </div>
+</dialog>
+
+<!-- Cambios -->
+<dialog id="dlgSubs" class="panel">
+  <div class="dhead">
+    <div>
+      <h2>Cambios</h2>
+      <div class="sub">Tocá un jugador para entrar o salir</div>
+    </div>
+    <button class="x" data-close="dlgSubs" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="dbody">
+    <div class="tabs" id="subsTabs">
+      <button data-t="0" class="on">LOCAL</button>
+      <button data-t="1">VISITA</button>
+    </div>
+    <div id="subsBody"></div>
+  </div>
+  <div class="dfoot">
+    <button data-close="dlgSubs" class="primary">Listo</button>
+  </div>
+</dialog>
+
+<!-- Estadísticas -->
+<dialog id="dlgStats" class="panel">
+  <div class="dhead">
+    <div>
+      <h2>Estadísticas</h2>
+      <div class="sub">Pts · Faltas · Técnicas · Minutos</div>
+    </div>
+    <button class="x" data-close="dlgStats" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="dbody">
+    <div class="tabs" id="statsTabs">
+      <button data-t="0" class="on">LOCAL</button>
+      <button data-t="1">VISITA</button>
+    </div>
+    <div id="statsBody"></div>
+  </div>
+  <div class="dfoot">
+    <button data-close="dlgStats" class="primary">Cerrar</button>
+  </div>
+</dialog>
+
+<!-- Corregir tiempo -->
+<dialog id="dlgTime" class="panel">
+  <div class="dhead">
+    <h2>Corregir tiempo</h2>
+    <button class="x" data-close="dlgTime" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="dbody">
+    <div class="timeEdit">
+      <input id="tMin" type="number" min="0" max="99" inputmode="numeric" aria-label="Minutos">
+      <span>:</span>
+      <input id="tSec" type="number" min="0" max="59" inputmode="numeric" aria-label="Segundos">
+    </div>
+    <div class="quickTime">
+      <button data-dt="-60">−1 min</button>
+      <button data-dt="-10">−10 s</button>
+      <button data-dt="10">+10 s</button>
+      <button data-dt="60">+1 min</button>
+    </div>
+    <p class="note">Corregir el reloj no cambia el tiempo ya acumulado por los jugadores.</p>
+  </div>
+  <div class="dfoot">
+    <button id="tFull">Reiniciar periodo</button>
+    <button id="tSave" class="primary">Guardar</button>
+  </div>
+</dialog>
+
+<!-- Ajustes -->
+<dialog id="dlgSet" class="panel">
+  <div class="dhead">
+    <h2>Ajustes del partido</h2>
+    <button class="x" data-close="dlgSet" aria-label="Cerrar">✕</button>
+  </div>
+  <div class="dbody">
+    <div class="row">
+      <div class="field">
+        <label for="in0">Equipo local</label>
+        <input id="in0" maxlength="14" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="in1">Equipo visita</label>
+        <input id="in1" maxlength="14" autocomplete="off">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="inMin">Minutos por periodo</label>
+        <input id="inMin" type="number" min="1" max="60" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label for="inPer">Periodos</label>
+        <input id="inPer" type="number" min="1" max="8" inputmode="numeric">
+      </div>
     </div>
   </div>
-  <div class="actions">
-    <button id="dlgCancel">Cancelar</button>
-    <button id="dlgSave" class="primary">Guardar</button>
+  <div class="dfoot">
+    <button data-close="dlgSet">Cancelar</button>
+    <button id="setSave" class="primary">Guardar</button>
   </div>
 </dialog>
 
@@ -391,47 +522,102 @@
 (function(){
   "use strict";
 
-  var KEY = "basket-marcador-v1";
-  var DEF = {
-    names:["LOCAL","VISITA"],
-    score:[0,0],
-    fouls:[0,0],
-    period:1,
-    periods:4,
-    minutes:10,
-    remaining:600,   // segundos restantes del periodo
-    quick:2
-  };
+  var KEY = "basket-marcador-v2";
+  var KEY_V1 = "basket-marcador-v1";
+  var MAX_PLANTEL = 15;
+  var MAX_CANCHA = 5;
+  var FALTAS_EXPULSION = 5;
 
-  var st = load();
-  var history = [];      // pila de acciones para deshacer
-  var timer = null;      // id de setInterval
-  var endsAt = 0;        // timestamp de fin cuando el reloj corre
+  function estadoNuevo(){
+    return {
+      names:["LOCAL","VISITA"],
+      score:[0,0],
+      teamFouls:[0,0],
+      period:1,
+      periods:4,
+      minutes:10,
+      remaining:600,
+      running:false,
+      endsAt:0,
+      quick:2,
+      nextId:1,
+      teams:[{players:[]},{players:[]}]
+    };
+  }
 
-  var $ = function(id){ return document.getElementById(id); };
+  var st = cargar();
+  var history = [];
+  var pend = null;          // asignación pendiente mientras está abierto el selector
+  var timer = null;
+  var ticks = 0;
+  var wake = null;
+  var rosterTab = 0, subsTab = 0, statsTab = 0;
+  var subsMsg = "";
 
-  function load(){
+  function $(id){ return document.getElementById(id); }
+
+  /* ---------- Persistencia ---------- */
+  function cargar(){
+    var base = estadoNuevo();
     try{
       var raw = localStorage.getItem(KEY);
-      if(!raw) return Object.assign({}, DEF);
-      var s = JSON.parse(raw);
-      return Object.assign({}, DEF, s, {
-        names: (s.names || DEF.names).slice(0,2),
-        score: (s.score || DEF.score).slice(0,2),
-        fouls: (s.fouls || DEF.fouls).slice(0,2)
-      });
-    }catch(e){
-      return Object.assign({}, DEF);
-    }
+      if(raw) return sanear(Object.assign(base, JSON.parse(raw)));
+      var viejo = localStorage.getItem(KEY_V1);
+      if(viejo){
+        // Partido empezado con la versión anterior: se rescata lo que existía.
+        var v1 = JSON.parse(viejo);
+        base.names = v1.names || base.names;
+        base.score = v1.score || base.score;
+        base.teamFouls = v1.fouls || base.teamFouls;
+        base.period = v1.period || 1;
+        base.periods = v1.periods || 4;
+        base.minutes = v1.minutes || 10;
+        base.remaining = typeof v1.remaining === "number" ? v1.remaining : base.minutes*60;
+        base.quick = v1.quick || 2;
+      }
+    }catch(e){}
+    return sanear(base);
   }
+
+  function sanear(s){
+    var def = estadoNuevo();
+    s.names = (s.names || def.names).slice(0,2);
+    s.score = (s.score || def.score).slice(0,2).map(num0);
+    s.teamFouls = (s.teamFouls || def.teamFouls).slice(0,2).map(num0);
+    s.periods = Math.min(8, Math.max(1, num0(s.periods) || 4));
+    s.minutes = Math.min(60, Math.max(1, num0(s.minutes) || 10));
+    s.period = Math.min(s.periods, Math.max(1, num0(s.period) || 1));
+    s.quick = [1,2,3].indexOf(s.quick) >= 0 ? s.quick : 2;
+    s.remaining = Math.max(0, num0(s.remaining));
+    s.nextId = Math.max(1, num0(s.nextId) || 1);
+    s.teams = [0,1].map(function(i){
+      var t = (s.teams && s.teams[i]) || {};
+      var players = (t.players || []).slice(0, MAX_PLANTEL).map(function(p){
+        return {
+          id: num0(p.id) || (s.nextId++),
+          num: String(p.num == null ? "" : p.num).slice(0,3),
+          name: String(p.name == null ? "" : p.name).slice(0,20),
+          pts: num0(p.pts), pf: num0(p.pf), tf: num0(p.tf), sec: Math.max(0, num0(p.sec)),
+          on: !!p.on
+        };
+      });
+      // Nunca más de cinco en cancha, aunque el guardado venga tocado a mano.
+      var enCancha = 0;
+      players.forEach(function(p){
+        if(p.on){ enCancha++; if(enCancha > MAX_CANCHA) p.on = false; }
+      });
+      return {players:players};
+    });
+    return s;
+  }
+
+  function num0(v){ var n = Number(v); return isFinite(n) ? n : 0; }
 
   function save(){
     try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(e){}
   }
 
-  function buzz(ms){
-    if(navigator.vibrate) { try{ navigator.vibrate(ms); }catch(e){} }
-  }
+  function buzz(p){ if(navigator.vibrate){ try{ navigator.vibrate(p); }catch(e){} } }
 
   function fmt(sec){
     sec = Math.max(0, Math.ceil(sec));
@@ -439,216 +625,535 @@
     return m + ":" + (s<10 ? "0"+s : s);
   }
 
-  /* ---------- Render ---------- */
-  function render(){
-    $("name0").textContent = st.names[0];
-    $("name1").textContent = st.names[1];
-    $("score0").textContent = st.score[0];
-    $("score1").textContent = st.score[1];
-    $("foul0").textContent = st.fouls[0];
-    $("foul1").textContent = st.fouls[1];
-    $("foul0").classList.toggle("warn", st.fouls[0] >= 5);
-    $("foul1").classList.toggle("warn", st.fouls[1] >= 5);
-    $("period").textContent = st.period;
-
-    var qs = document.querySelectorAll(".quick");
-    for(var i=0;i<qs.length;i++) qs[i].textContent = st.quick;
-    var sel = document.querySelectorAll("#quickSel button");
-    for(var j=0;j<sel.length;j++){
-      sel[j].classList.toggle("on", Number(sel[j].dataset.quick) === st.quick);
+  /* ---------- Reloj ----------
+     El tiempo se mide contra el reloj del sistema (endsAt), no contando ticks:
+     así sigue corriendo con la app en segundo plano o la pantalla bloqueada. */
+  function syncClock(){
+    if(!st.running) return;
+    var antes = st.remaining;
+    st.remaining = Math.max(0, (st.endsAt - Date.now())/1000);
+    var usado = Math.max(0, antes - st.remaining);
+    if(usado > 0) acumularTiempo(usado);
+    if(st.remaining <= 0){
+      st.running = false;
+      soltarWake();
+      buzz([220,120,220]);
     }
-
-    renderClock();
-    $("undo").disabled = history.length === 0;
   }
 
-  function renderClock(){
-    var c = $("clock");
-    c.textContent = fmt(st.remaining);
-    c.classList.toggle("running", timer !== null);
-    c.classList.toggle("ended", st.remaining <= 0);
-    $("clockToggle").textContent = timer ? "⏸" : "▶";
+  function acumularTiempo(seg){
+    for(var t=0; t<2; t++){
+      var ps = st.teams[t].players;
+      for(var i=0; i<ps.length; i++) if(ps[i].on) ps[i].sec += seg;
+    }
+  }
+
+  function asegurarTimer(){
+    if(timer) return;
+    timer = setInterval(function(){
+      if(!st.running){ clearInterval(timer); timer = null; return; }
+      var corria = st.running;
+      syncClock();
+      renderClock();
+      if(corria && !st.running){ save(); render(); return; }   // se acabó el periodo
+      if(++ticks % 20 === 0) save();
+    }, 250);
+  }
+
+  function arrancarReloj(){
+    if(st.running || st.remaining <= 0) return;
+    st.endsAt = Date.now() + st.remaining*1000;
+    st.running = true;
+    asegurarTimer();
+    pedirWake();
+    save();
+    render();
+  }
+
+  function pararReloj(){
+    if(!st.running) return;
+    syncClock();
+    st.running = false;
+    soltarWake();
+    save();
+    render();
+  }
+
+  function fijarReloj(seg){
+    syncClock();
+    st.remaining = Math.max(0, Math.min(99*60, seg));
+    if(st.running){
+      if(st.remaining <= 0){ st.running = false; soltarWake(); }
+      else st.endsAt = Date.now() + st.remaining*1000;
+    }
+    save();
+    render();
+  }
+
+  function pedirWake(){
+    if(!navigator.wakeLock) return;
+    try{
+      navigator.wakeLock.request("screen").then(function(w){ wake = w; }, function(){});
+    }catch(e){}
+  }
+
+  function soltarWake(){
+    if(!wake) return;
+    try{ wake.release(); }catch(e){}
+    wake = null;
+  }
+
+  /* ---------- Jugadores ---------- */
+  function jugador(team, pid){
+    var ps = st.teams[team].players;
+    for(var i=0; i<ps.length; i++) if(ps[i].id === pid) return ps[i];
+    return null;
+  }
+
+  function enCancha(team){
+    return st.teams[team].players.filter(function(p){ return p.on; });
+  }
+
+  function etiqueta(p){
+    return p.num !== "" ? p.num : "—";
+  }
+
+  /* ---------- Acciones del partido ---------- */
+  function pedir(kind, team, v){
+    // Sin plantel cargado no tiene sentido preguntar: va derecho al equipo.
+    if(st.teams[team].players.length === 0){ aplicar(kind, team, v, null); return; }
+    if(kind === "pts" && v < 0 && candidatos(team, true).length === 0){ aplicar(kind, team, v, null); return; }
+    pend = {kind:kind, team:team, v:v};
+    abrirWho();
+  }
+
+  function candidatos(team, soloConPuntos){
+    return st.teams[team].players.filter(function(p){
+      return soloConPuntos ? p.pts > 0 : true;
+    });
+  }
+
+  function aplicar(kind, team, v, pid){
+    var p = pid == null ? null : jugador(team, pid);
+
+    if(kind === "pts"){
+      if(v > 0 && st.score[team] >= 999) return;
+      if(v < 0 && st.score[team] <= 0) return;
+      if(v < 0 && p && p.pts <= 0) return;
+      st.score[team] += v;
+      if(p) p.pts += v;
+      flash(team, (v>0?"+":"") + v);
+      buzz(v>0 ? 18 : 8);
+    }else if(kind === "falta"){
+      st.teamFouls[team] += 1;
+      if(p) p.pf += 1;
+      flash(team, "F");
+      buzz(14);
+    }else if(kind === "tecnica"){
+      st.teamFouls[team] += 1;
+      if(p) p.tf += 1;
+      flash(team, "T");
+      buzz([14,60,14]);
+    }
+
+    history.push({t:kind, team:team, v:v, pid:p ? p.id : null});
+    save();
+    render();
+  }
+
+  function deshacer(){
+    var a = history.pop();
+    if(!a) return;
+    var p = a.pid == null ? null : jugador(a.team, a.pid);
+
+    if(a.t === "pts"){
+      st.score[a.team] -= a.v;
+      if(p) p.pts -= a.v;
+    }else if(a.t === "falta"){
+      st.teamFouls[a.team] -= 1;
+      if(p) p.pf -= 1;
+    }else if(a.t === "tecnica"){
+      st.teamFouls[a.team] -= 1;
+      if(p) p.tf -= 1;
+    }else if(a.t === "periodo"){
+      st.period = a.from;
+      st.teamFouls = a.teamFouls.slice();
+      fijarReloj(a.remaining);
+    }
+    buzz(25);
+    save();
+    render();
+  }
+
+  function cambiarPeriodo(d){
+    var next = st.period + d;
+    if(next < 1 || next > st.periods) return;
+    pararReloj();
+    history.push({t:"periodo", from:st.period, remaining:st.remaining, teamFouls:st.teamFouls.slice()});
+    st.period = next;
+    st.remaining = st.minutes * 60;
+    st.teamFouls = [0,0];   // las faltas de equipo se reinician cada periodo
+    save();
+    render();
   }
 
   function flash(team, txt){
     var el = $("flash"+team);
     el.textContent = txt;
     el.classList.remove("go");
-    void el.offsetWidth;   // reinicia la animación
+    void el.offsetWidth;
     el.classList.add("go");
   }
 
-  /* ---------- Acciones ---------- */
-  function addPoints(team, v){
-    if(v > 0 && st.score[team] >= 999) return;
-    if(v < 0 && st.score[team] <= 0) return;
-    st.score[team] += v;
-    history.push({t:"score", team:team, v:v});
-    flash(team, (v>0?"+":"") + v);
-    buzz(v>0 ? 18 : 8);
-    save();
-    render();
-  }
-
-  function addFoul(team, d){
-    if(st.fouls[team] + d < 0) return;
-    st.fouls[team] += d;
-    history.push({t:"foul", team:team, v:d});
-    buzz(10);
-    save();
-    render();
-  }
-
-  function undo(){
-    var a = history.pop();
-    if(!a) return;
-    if(a.t === "score") st.score[a.team] -= a.v;
-    else if(a.t === "foul") st.fouls[a.team] -= a.v;
-    else if(a.t === "period"){ st.period = a.from; st.remaining = a.remaining; }
-    buzz(25);
-    save();
-    render();
-  }
-
-  function changePeriod(d){
-    var next = st.period + d;
-    if(next < 1 || next > st.periods) return;
-    stopClock();
-    history.push({t:"period", from:st.period, remaining:st.remaining});
-    st.period = next;
-    st.remaining = st.minutes * 60;
-    // Las faltas de equipo se reinician cada periodo.
-    st.fouls = [0,0];
-    save();
-    render();
-  }
-
-  /* ---------- Reloj ---------- */
-  function startClock(){
-    if(timer || st.remaining <= 0) return;
-    endsAt = Date.now() + st.remaining * 1000;
-    timer = setInterval(tick, 200);
-    renderClock();
-  }
-
-  function stopClock(){
-    if(!timer) return;
-    clearInterval(timer);
-    timer = null;
-    st.remaining = Math.max(0, (endsAt - Date.now()) / 1000);
-    save();
-    renderClock();
-  }
-
-  function tick(){
-    st.remaining = Math.max(0, (endsAt - Date.now()) / 1000);
-    if(st.remaining <= 0){
-      clearInterval(timer);
-      timer = null;
-      st.remaining = 0;
-      buzz([220,120,220]);
-      save();
+  /* ---------- Render principal ---------- */
+  function render(){
+    for(var t=0; t<2; t++){
+      $("name"+t).textContent = st.names[t];
+      $("score"+t).textContent = st.score[t];
+      var tf = $("tf"+t);
+      tf.innerHTML = "Faltas equipo <b>" + st.teamFouls[t] + "</b>";
+      tf.classList.toggle("bonus", st.teamFouls[t] >= FALTAS_EXPULSION);
     }
+    $("period").textContent = st.period;
+
+    var qs = document.querySelectorAll(".quick");
+    for(var i=0; i<qs.length; i++) qs[i].textContent = st.quick;
+    var sel = document.querySelectorAll("#quickSel button");
+    for(var j=0; j<sel.length; j++){
+      sel[j].classList.toggle("on", Number(sel[j].dataset.quick) === st.quick);
+    }
+
+    $("undo").disabled = history.length === 0;
     renderClock();
   }
 
-  function resetClock(){
-    stopClock();
-    st.remaining = st.minutes * 60;
+  function renderClock(){
+    var c = $("clock");
+    c.textContent = fmt(st.remaining);
+    c.classList.toggle("running", st.running);
+    c.classList.toggle("ended", st.remaining <= 0);
+    $("clockToggle").textContent = st.running ? "⏸" : "▶";
+  }
+
+  /* ---------- Selector de jugador ---------- */
+  function abrirWho(){
+    var titulo, sub = st.names[pend.team];
+    if(pend.kind === "pts") titulo = (pend.v > 0 ? "¿Quién anotó? +" + pend.v : "¿A quién le resto " + Math.abs(pend.v) + "?");
+    else if(pend.kind === "falta") titulo = "¿Quién hizo la falta?";
+    else titulo = "¿Técnica de quién?";
+    $("whoTitle").textContent = titulo;
+    $("whoSub").textContent = sub;
+    renderWho();
+    $("dlgWho").showModal();
+  }
+
+  function renderWho(){
+    var team = pend.team;
+    var soloConPuntos = pend.kind === "pts" && pend.v < 0;
+    var lista = candidatos(team, soloConPuntos);
+    var dentro = lista.filter(function(p){ return p.on; });
+    var fuera = lista.filter(function(p){ return !p.on; });
+    var html = "";
+
+    if(!lista.length){
+      html = '<p class="empty">No hay jugadores para asignar.<br>Cargalos en <b>Menú → Planilla</b>.</p>';
+    }else{
+      if(dentro.length) html += '<div class="groupTitle">En cancha</div>' + grilla(dentro);
+      if(fuera.length) html += '<div class="groupTitle">' + (dentro.length ? "Banco" : "Plantel") + '</div>' + grilla(fuera);
+    }
+    $("whoBody").innerHTML = html;
+  }
+
+  function grilla(ps){
+    var esFalta = pend.kind === "falta" || pend.kind === "tecnica";
+    return '<div class="who">' + ps.map(function(p){
+      var extra = "";
+      if(esFalta && p.pf > 0) extra = '<span class="pf">' + p.pf + ' F</span>';
+      else if(!esFalta && p.pts > 0) extra = '<span class="nm">' + p.pts + ' pts</span>';
+      else if(p.name) extra = '<span class="nm">' + escapar(p.name) + '</span>';
+      return '<button data-pid="' + p.id + '" class="' + (p.on ? "" : "out") + '">' +
+             '<span class="num">' + escapar(etiqueta(p)) + '</span>' + extra + '</button>';
+    }).join("") + '</div>';
+  }
+
+  function escapar(s){
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  function cerrarWho(asignarA){
+    // Se guarda la pendiente antes de cerrar: al cerrar se dispara "close", que la limpia.
+    var p = pend;
+    pend = null;
+    var d = $("dlgWho");
+    if(d.open) d.close();
+    if(p && asignarA !== false) aplicar(p.kind, p.team, p.v, asignarA);
+  }
+
+  /* ---------- Planilla ---------- */
+  function renderRoster(){
+    var ps = st.teams[rosterTab].players;
+    var html = ps.map(function(p, i){
+      return '<div class="rosterRow">' +
+        '<input class="n" data-i="' + i + '" data-f="num" maxlength="3" inputmode="numeric" ' +
+        'value="' + escapar(p.num) + '" placeholder="#" aria-label="Número">' +
+        '<input class="nm" data-i="' + i + '" data-f="name" maxlength="20" ' +
+        'value="' + escapar(p.name) + '" placeholder="Nombre" aria-label="Nombre">' +
+        '<button class="del" data-del="' + i + '" aria-label="Borrar">✕</button>' +
+        '</div>';
+    }).join("");
+    if(!ps.length) html = '<p class="empty">Todavía no hay jugadores cargados.</p>';
+    $("rosterList").innerHTML = html;
+    $("rosterAdd").textContent = ps.length >= MAX_PLANTEL
+      ? "Plantel completo (" + MAX_PLANTEL + ")"
+      : "+ Agregar jugador (" + ps.length + "/" + MAX_PLANTEL + ")";
+    $("rosterAdd").disabled = ps.length >= MAX_PLANTEL;
+    marcarTabs("rosterTabs", rosterTab);
+  }
+
+  function leerRoster(){
+    var ps = st.teams[rosterTab].players;
+    var ins = $("rosterList").querySelectorAll("input");
+    for(var i=0; i<ins.length; i++){
+      var el = ins[i], p = ps[Number(el.dataset.i)];
+      if(!p) continue;
+      if(el.dataset.f === "num") p.num = el.value.trim().slice(0,3);
+      else p.name = el.value.trim().slice(0,20);
+    }
+  }
+
+  /* ---------- Cambios ---------- */
+  function renderSubs(){
+    var ps = st.teams[subsTab].players;
+    var dentro = ps.filter(function(p){ return p.on; }).length;
+    var html = '<div class="counter' + (dentro === MAX_CANCHA ? " full" : "") + '">En cancha: <b>' +
+               dentro + "/" + MAX_CANCHA + "</b>" + (subsMsg ? " · " + escapar(subsMsg) : "") + "</div>";
+
+    if(!ps.length){
+      html += '<p class="empty">Cargá primero la planilla en <b>Menú → Planilla</b>.</p>';
+    }else{
+      html += '<div class="subsGrid">' + ps.map(function(p){
+        return '<button data-sub="' + p.id + '" class="' + (p.on ? "oncourt" : "") + '">' +
+               '<span class="num">' + escapar(etiqueta(p)) + '</span>' +
+               '<span class="meta">' + (p.name ? escapar(p.name) + " · " : "") + fmt(p.sec) + '</span>' +
+               '</button>';
+      }).join("") + '</div>';
+      html += '<p class="note">El tiempo corre solo para los que están en cancha y solo con el reloj andando. ' +
+              'Al hacer un cambio, el que sale deja de sumar minutos y el que entra empieza a sumarlos.</p>';
+    }
+    $("subsBody").innerHTML = html;
+    marcarTabs("subsTabs", subsTab);
+  }
+
+  function alternarCancha(pid){
+    syncClock();                       // cortar el tiempo justo antes del cambio
+    var p = jugador(subsTab, pid);
+    if(!p) return;
+    if(!p.on && enCancha(subsTab).length >= MAX_CANCHA){
+      subsMsg = "Ya hay " + MAX_CANCHA + ", sacá a uno primero";
+      buzz([10,60,10]);
+    }else{
+      p.on = !p.on;
+      subsMsg = "";
+      buzz(12);
+    }
     save();
-    render();
+    renderSubs();
+  }
+
+  /* ---------- Estadísticas ---------- */
+  function renderStats(){
+    syncClock();
+    var ps = st.teams[statsTab].players.slice().sort(function(a,b){
+      return (Number(a.num) || 0) - (Number(b.num) || 0);
+    });
+    var html;
+    if(!ps.length){
+      html = '<p class="empty">Sin jugadores cargados.<br>Los puntos y faltas quedaron sumados al equipo.</p>';
+    }else{
+      var tp = 0, tf = 0, tt = 0;
+      html = '<table><thead><tr><th>#</th><th>Jugador</th><th>Pts</th><th>F</th><th>T</th><th>Min</th></tr></thead><tbody>' +
+        ps.map(function(p){
+          tp += p.pts; tf += p.pf; tt += p.tf;
+          return '<tr class="' + (p.on ? "on" : "") + '">' +
+            '<td>' + escapar(etiqueta(p)) + '</td>' +
+            '<td>' + escapar(p.name || "—") + '</td>' +
+            '<td>' + p.pts + '</td>' +
+            '<td class="' + (p.pf >= FALTAS_EXPULSION ? "foulOut" : "") + '">' + p.pf + '</td>' +
+            '<td>' + p.tf + '</td>' +
+            '<td>' + fmt(p.sec) + '</td></tr>';
+        }).join("") +
+        '</tbody><tfoot><tr><td></td><td>Asignado</td><td>' + tp + '</td><td>' + tf + '</td><td>' + tt + '</td><td></td></tr>' +
+        '<tr><td></td><td>Equipo</td><td>' + st.score[statsTab] + '</td><td>' + st.teamFouls[statsTab] +
+        '</td><td></td><td></td></tr></tfoot></table>' +
+        '<p class="note">«Asignado» es lo cargado a jugadores; «Equipo» es el marcador y las faltas del periodo. ' +
+        'La diferencia es lo que quedó sin asignar. Verde = en cancha.</p>';
+    }
+    $("statsBody").innerHTML = html;
+    marcarTabs("statsTabs", statsTab);
+  }
+
+  function marcarTabs(cont, activa){
+    var bs = $(cont).querySelectorAll("button");
+    for(var i=0; i<bs.length; i++){
+      bs[i].classList.toggle("on", Number(bs[i].dataset.t) === activa);
+      bs[i].textContent = st.names[Number(bs[i].dataset.t)];
+    }
   }
 
   /* ---------- Eventos ---------- */
   document.addEventListener("click", function(ev){
-    var el = ev.target.closest("[data-tap],[data-add],[data-foul],[data-quick]");
+    var el = ev.target.closest("[data-tap],[data-add],[data-foul],[data-tech],[data-quick],[data-close],[data-pid],[data-sub],[data-del],[data-t],[data-dt]");
     if(!el) return;
 
-    if(el.hasAttribute("data-add")){
-      addPoints(Number(el.dataset.add), Number(el.dataset.v));
-    }else if(el.hasAttribute("data-foul")){
-      addFoul(Number(el.dataset.foul), Number(el.dataset.d));
-    }else if(el.hasAttribute("data-quick")){
+    if(el.hasAttribute("data-tap")) pedir("pts", Number(el.dataset.tap), st.quick);
+    else if(el.hasAttribute("data-add")) pedir("pts", Number(el.dataset.add), Number(el.dataset.v));
+    else if(el.hasAttribute("data-foul")) pedir("falta", Number(el.dataset.foul), 1);
+    else if(el.hasAttribute("data-tech")) pedir("tecnica", Number(el.dataset.tech), 1);
+    else if(el.hasAttribute("data-pid")) cerrarWho(Number(el.dataset.pid));
+    else if(el.hasAttribute("data-sub")) alternarCancha(Number(el.dataset.sub));
+    else if(el.hasAttribute("data-quick")){
       st.quick = Number(el.dataset.quick);
-      buzz(8);
-      save();
-      render();
-    }else if(el.hasAttribute("data-tap")){
-      addPoints(Number(el.dataset.tap), st.quick);
+      buzz(8); save(); render();
+    }
+    else if(el.hasAttribute("data-close")) $(el.dataset.close).close();
+    else if(el.hasAttribute("data-dt")){
+      fijarReloj(st.remaining + Number(el.dataset.dt));
+      llenarTiempo();
+    }
+    else if(el.hasAttribute("data-del")){
+      leerRoster();
+      var i = Number(el.dataset.del), p = st.teams[rosterTab].players[i];
+      if(p && (p.pts || p.pf || p.tf || p.sec > 1) &&
+         !confirm("Ese jugador ya tiene estadísticas cargadas. ¿Borrarlo igual?")) return;
+      st.teams[rosterTab].players.splice(i, 1);
+      save(); renderRoster();
+    }
+    else if(el.hasAttribute("data-t")){
+      var t = Number(el.dataset.t), cont = el.parentNode.id;
+      if(cont === "rosterTabs"){ leerRoster(); rosterTab = t; renderRoster(); }
+      else if(cont === "subsTabs"){ subsTab = t; subsMsg = ""; renderSubs(); }
+      else if(cont === "statsTabs"){ statsTab = t; renderStats(); }
     }
   });
 
-  $("perPlus").addEventListener("click", function(){ changePeriod(1); });
-  $("perMinus").addEventListener("click", function(){ changePeriod(-1); });
-  $("clockToggle").addEventListener("click", function(){ timer ? stopClock() : startClock(); });
-  $("clockReset").addEventListener("click", resetClock);
-  $("undo").addEventListener("click", undo);
+  $("perPlus").addEventListener("click", function(){ cambiarPeriodo(1); });
+  $("perMinus").addEventListener("click", function(){ cambiarPeriodo(-1); });
+  $("clockToggle").addEventListener("click", function(){ st.running ? pararReloj() : arrancarReloj(); });
+  $("undo").addEventListener("click", deshacer);
+  $("whoSkip").addEventListener("click", function(){ cerrarWho(null); });
+  $("whoClose").addEventListener("click", function(){ cerrarWho(false); });
+  $("dlgWho").addEventListener("close", function(){ pend = null; });
 
-  $("reset").addEventListener("click", function(){
-    if(!confirm("¿Empezar un partido nuevo? Se borra el marcador.")) return;
-    stopClock();
-    st.score = [0,0];
-    st.fouls = [0,0];
-    st.period = 1;
-    st.remaining = st.minutes * 60;
-    history = [];
-    save();
-    render();
+  $("menu").addEventListener("click", function(){ $("dlgMenu").showModal(); });
+  $("mRoster").addEventListener("click", function(){
+    $("dlgMenu").close(); rosterTab = 0; renderRoster(); $("dlgRoster").showModal();
   });
-
-  var dlg = $("dlg");
-  $("settings").addEventListener("click", function(){
+  $("mSubs").addEventListener("click", function(){
+    $("dlgMenu").close(); subsTab = 0; subsMsg = ""; renderSubs(); $("dlgSubs").showModal();
+  });
+  $("mStats").addEventListener("click", function(){
+    $("dlgMenu").close(); statsTab = 0; renderStats(); $("dlgStats").showModal();
+  });
+  $("mSettings").addEventListener("click", function(){
+    $("dlgMenu").close();
     $("in0").value = st.names[0];
     $("in1").value = st.names[1];
     $("inMin").value = st.minutes;
     $("inPer").value = st.periods;
-    dlg.showModal();
+    $("dlgSet").showModal();
   });
-  $("dlgCancel").addEventListener("click", function(){ dlg.close(); });
-  $("dlgSave").addEventListener("click", function(){
+  $("mReset").addEventListener("click", function(){
+    if(!confirm("¿Partido nuevo? Se borran marcador, faltas y estadísticas. La planilla se conserva.")) return;
+    $("dlgMenu").close();
+    pararReloj();
+    st.score = [0,0];
+    st.teamFouls = [0,0];
+    st.period = 1;
+    st.remaining = st.minutes * 60;
+    st.teams.forEach(function(t){
+      t.players.forEach(function(p){ p.pts = 0; p.pf = 0; p.tf = 0; p.sec = 0; });
+    });
+    history = [];
+    save(); render();
+  });
+
+  $("rosterAdd").addEventListener("click", function(){
+    leerRoster();
+    var ps = st.teams[rosterTab].players;
+    if(ps.length >= MAX_PLANTEL) return;
+    ps.push({id:st.nextId++, num:"", name:"", pts:0, pf:0, tf:0, sec:0, on:false});
+    save(); renderRoster();
+    var ins = $("rosterList").querySelectorAll("input.n");
+    if(ins.length) ins[ins.length-1].focus();
+  });
+  $("rosterSave").addEventListener("click", function(){
+    leerRoster(); save(); render(); $("dlgRoster").close();
+  });
+
+  $("clock").addEventListener("click", function(){
+    syncClock(); llenarTiempo(); $("dlgTime").showModal();
+  });
+  function llenarTiempo(){
+    var s = Math.max(0, Math.ceil(st.remaining));
+    $("tMin").value = Math.floor(s/60);
+    $("tSec").value = s % 60;
+    renderClock();
+  }
+  $("tSave").addEventListener("click", function(){
+    var m = Math.max(0, Math.min(99, Number($("tMin").value) || 0));
+    var s = Math.max(0, Math.min(59, Number($("tSec").value) || 0));
+    fijarReloj(m*60 + s);
+    $("dlgTime").close();
+  });
+  $("tFull").addEventListener("click", function(){
+    fijarReloj(st.minutes * 60);
+    llenarTiempo();
+  });
+
+  $("setSave").addEventListener("click", function(){
     var n0 = $("in0").value.trim() || "LOCAL";
     var n1 = $("in1").value.trim() || "VISITA";
     var min = Math.min(60, Math.max(1, Number($("inMin").value) || st.minutes));
     var per = Math.min(8, Math.max(1, Number($("inPer").value) || st.periods));
-    var minChanged = min !== st.minutes;
+    var cambioMin = min !== st.minutes;
 
     st.names = [n0.toUpperCase(), n1.toUpperCase()];
     st.minutes = min;
     st.periods = per;
     if(st.period > per) st.period = per;
-    if(minChanged){
-      stopClock();
-      st.remaining = min * 60;
-    }
-    save();
-    render();
-    dlg.close();
+    if(cambioMin){ pararReloj(); st.remaining = min * 60; }
+    save(); render();
+    $("dlgSet").close();
   });
 
-  // Teclado, útil si se usa en una laptop: A/L suman, espacio arranca el reloj.
+  // Teclado, para cuando se usa en una computadora.
   document.addEventListener("keydown", function(ev){
-    if(dlg.open) return;
+    if(document.querySelector("dialog[open]")) return;
     var k = ev.key.toLowerCase();
-    if(k === "a") addPoints(0, st.quick);
-    else if(k === "l") addPoints(1, st.quick);
-    else if(k === " "){ ev.preventDefault(); timer ? stopClock() : startClock(); }
-    else if(k === "z") undo();
+    if(k === "a") pedir("pts", 0, st.quick);
+    else if(k === "l") pedir("pts", 1, st.quick);
+    else if(k === " "){ ev.preventDefault(); st.running ? pararReloj() : arrancarReloj(); }
+    else if(k === "z") deshacer();
     else if(k === "1" || k === "2" || k === "3"){ st.quick = Number(k); save(); render(); }
   });
 
-  // El reloj se pausa si la pestaña se oculta, para no perder segundos reales.
+  // Al volver de segundo plano hay que ponerse al día: el reloj siguió corriendo.
   document.addEventListener("visibilitychange", function(){
-    if(document.hidden && timer) stopClock();
+    if(document.visibilityState === "visible"){
+      syncClock();
+      render();
+      if(st.running){ asegurarTimer(); pedirWake(); }
+    }else{
+      syncClock();
+      save();
+    }
   });
+  window.addEventListener("pagehide", function(){ syncClock(); save(); });
 
-  // Evita el zoom por doble toque en iOS sobre las zonas de puntuación.
-  var lastTouch = 0;
-  document.addEventListener("touchend", function(ev){
-    var now = Date.now();
-    if(now - lastTouch < 300) ev.preventDefault();
-    lastTouch = now;
-  }, {passive:false});
-
+  /* ---------- Arranque ---------- */
+  syncClock();          // recupera el tiempo transcurrido con la app cerrada
+  if(st.running){ asegurarTimer(); pedirWake(); }
+  save();
   render();
 })();
 </script>
