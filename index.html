@@ -9,6 +9,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Marcador de Básquet</title>
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
 <style>
   :root{
     --bg:#0f1115;
@@ -1151,6 +1154,12 @@
   window.addEventListener("pagehide", function(){ syncClock(); save(); });
 
   /* ---------- Arranque ---------- */
+  if("serviceWorker" in navigator && location.protocol.indexOf("http") === 0){
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("sw.js").catch(function(){});
+    });
+  }
+
   syncClock();          // recupera el tiempo transcurrido con la app cerrada
   if(st.running){ asegurarTimer(); pedirWake(); }
   save();
