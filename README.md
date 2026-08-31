@@ -76,3 +76,19 @@ cambios hay que subir el número de `CACHE` en `sw.js`.
 | `1` `2` `3` | Elige cuántos puntos suma cada toque |
 | `Espacio` | Arranca / pausa el reloj |
 | `Z` | Deshacer |
+
+---
+
+# Otras apps de este repositorio
+
+## Copiloto de Entrevista — [`entrevista/`](entrevista/)
+
+App para la computadora que se deja abierta durante una entrevista de trabajo en inglés:
+traduce al español lo que dice el entrevistador en simultáneo y, del otro lado de la pantalla,
+arma qué contestar apoyándose en el CV, los logros y el proyecto de outplacement ya cargados.
+También prepara de antemano un documento de respaldo (pitch, historias STAR, preguntas difíciles).
+
+Publicada en: **https://bluufloyd-droid.github.io/curly-garbanzo/entrevista/**
+
+La evaluación de qué esperar, los límites, el costo y la estructura del proyecto están en
+[`entrevista/README.md`](entrevista/README.md).

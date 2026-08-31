@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Copiloto de Entrevista</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icono.svg" type="image/svg+xml">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Entrevista">
+<style>
+:root{
+  --bg:#0d1117; --bg2:#161b22; --bg3:#1c2330; --line:#2a3240;
+  --txt:#e8edf5; --txt2:#9aa7b8; --txt3:#6b7889;
+  --acc:#4c8dff; --acc2:#7aa7ff; --ok:#3fb950; --warn:#e3b341; --err:#f85149;
+  --radius:12px;
+  --fs:1;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--bg); color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:calc(15px * var(--fs));
+  -webkit-font-smoothing:antialiased;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+button,input,textarea,select{font:inherit; color:inherit}
+button{cursor:pointer}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#303a4a;border-radius:8px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- barra superior ---------- */
+.bar{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:8px 12px; background:var(--bg2); border-bottom:1px solid var(--line);
+  -webkit-app-region:drag; flex:0 0 auto;
+}
+.bar > *{-webkit-app-region:no-drag}
+.marca{display:flex;align-items:center;gap:8px;font-weight:650;letter-spacing:.2px;margin-right:4px}
+.marca svg{width:22px;height:22px;flex:0 0 auto}
+.sep{flex:1}
+.btn{
+  background:var(--bg3); border:1px solid var(--line); color:var(--txt);
+  padding:7px 13px; border-radius:9px; font-size:.92em; font-weight:550;
+  display:inline-flex; align-items:center; gap:7px; white-space:nowrap;
+  transition:background .12s, border-color .12s;
+}
+.btn:hover{background:#242d3c}
+.btn:active{transform:translateY(1px)}
+.btn.pri{background:var(--acc); border-color:var(--acc); color:#fff}
+.btn.pri:hover{background:#3d7ff0}
+.btn.rec{background:var(--err); border-color:var(--err); color:#fff}
+.btn.rec:hover{background:#e0453c}
+.btn.mini{padding:4px 9px; font-size:.82em; border-radius:7px}
+.btn[disabled]{opacity:.42; pointer-events:none}
+.btn kbd{
+  background:rgba(255,255,255,.13); border-radius:4px; padding:1px 5px;
+  font-size:.78em; font-family:inherit; opacity:.85;
+}
+.estado{display:flex;align-items:center;gap:7px;font-size:.86em;color:var(--txt2)}
+.luz{width:9px;height:9px;border-radius:50%;background:#495468;flex:0 0 auto}
+.luz.on{background:var(--ok); box-shadow:0 0 0 0 rgba(63,185,80,.6); animation:pulso 1.8s infinite}
+.luz.err{background:var(--err)}
+.luz.wait{background:var(--warn)}
+@keyframes pulso{70%{box-shadow:0 0 0 8px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
+
+/* ---------- layout ---------- */
+main{flex:1; min-height:0; display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line)}
+main.solo-vivo{grid-template-columns:1fr}
+main.solo-apoyo{grid-template-columns:1fr}
+main.solo-vivo .col-apoyo, main.solo-apoyo .col-vivo{display:none}
+.col{background:var(--bg); min-width:0; display:flex; flex-direction:column; min-height:0}
+.col-cab{
+  display:flex; align-items:center; gap:8px; padding:7px 12px;
+  border-bottom:1px solid var(--line); background:var(--bg2); flex:0 0 auto;
+}
+.col-tit{font-size:.78em; text-transform:uppercase; letter-spacing:.09em; color:var(--txt3); font-weight:700}
+.cuerpo{flex:1; overflow-y:auto; padding:14px 16px 40vh; min-height:0; scroll-behavior:smooth}
+
+/* ---------- transcripción ---------- */
+.linea{
+  padding:9px 0 11px; border-bottom:1px solid #1b2230;
+  animation:entra .18s ease-out;
+}
+@keyframes entra{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.linea .en{color:var(--txt3); font-size:.92em; line-height:1.45; margin:0 0 3px}
+.linea .es{color:var(--txt); font-size:1.16em; line-height:1.5; margin:0; font-weight:450}
+.linea .es.pend{color:var(--txt3); font-style:italic}
+.linea.preg{border-left:3px solid var(--acc); padding-left:11px; margin-left:-14px}
+.linea.preg .es{color:#cfe0ff}
+.linea .meta{display:flex;align-items:center;gap:8px;margin-top:6px}
+.hora{font-size:.72em;color:#4d5769;font-variant-numeric:tabular-nums}
+.chip{
+  font-size:.7em; text-transform:uppercase; letter-spacing:.06em; font-weight:700;
+  background:rgba(76,141,255,.16); color:var(--acc2); padding:2px 7px; border-radius:20px;
+}
+.interina{padding:10px 0; color:var(--txt3); font-size:1.05em; font-style:italic; opacity:.75}
+.solo-es .linea .en{display:none}
+.vacio{color:var(--txt3); text-align:center; padding:48px 20px; line-height:1.7; font-size:.95em}
+.vacio h3{color:var(--txt2); font-size:1.05em; margin:0 0 10px; font-weight:600}
+
+/* ---------- pestañas apoyo ---------- */
+.tabs{display:flex;gap:3px}
+.tab{
+  background:transparent;border:0;color:var(--txt3);padding:6px 11px;border-radius:8px;
+  font-size:.86em;font-weight:600;
+}
+.tab:hover{color:var(--txt2);background:var(--bg3)}
+.tab.act{background:var(--bg3);color:var(--txt)}
+.panel{display:none}
+.panel.act{display:block}
+
+/* ---------- respuesta ---------- */
+.tarjeta{
+  background:var(--bg2); border:1px solid var(--line); border-radius:var(--radius);
+  padding:14px 16px; margin-bottom:12px;
+}
+.tarjeta h4{
+  margin:0 0 9px; font-size:.75em; text-transform:uppercase; letter-spacing:.09em;
+  color:var(--txt3); font-weight:700; display:flex; align-items:center; gap:8px;
+}
+.rta{font-size:1.13em; line-height:1.62}
+.rta strong{color:#fff;font-weight:650}
+.rta ul{margin:8px 0; padding-left:20px}
+.rta li{margin:6px 0}
+.rta .gloss{color:var(--txt2); font-size:.9em; font-style:italic; border-top:1px dashed var(--line); margin-top:12px; padding-top:10px}
+.pregunta-eco{
+  background:rgba(76,141,255,.09); border:1px solid rgba(76,141,255,.28);
+  border-radius:10px; padding:10px 13px; margin-bottom:12px; font-size:.96em; color:#cfe0ff;
+}
+.cargando{display:inline-flex;gap:4px;align-items:center;color:var(--txt3);font-size:.88em}
+.cargando i{width:5px;height:5px;border-radius:50%;background:var(--txt3);animation:pt 1.1s infinite}
+.cargando i:nth-child(2){animation-delay:.15s}
+.cargando i:nth-child(3){animation-delay:.3s}
+@keyframes pt{0%,60%,100%{opacity:.25}30%{opacity:1}}
+
+/* ---------- speech ---------- */
+.sec{border:1px solid var(--line); border-radius:var(--radius); margin-bottom:9px; background:var(--bg2); overflow:hidden}
+.sec > summary{
+  padding:11px 14px; cursor:pointer; font-weight:600; font-size:.98em;
+  display:flex; align-items:center; gap:9px; list-style:none;
+}
+.sec > summary::-webkit-details-marker{display:none}
+.sec > summary::before{content:"▸"; color:var(--txt3); transition:transform .15s; font-size:.9em}
+.sec[open] > summary::before{transform:rotate(90deg)}
+.sec > summary:hover{background:var(--bg3)}
+.sec .num{
+  background:var(--bg3); color:var(--txt3); width:20px; height:20px; border-radius:5px;
+  display:grid; place-items:center; font-size:.72em; font-weight:700; flex:0 0 auto;
+}
+.sec-cont{padding:2px 14px 14px 43px; font-size:1.05em; line-height:1.62; color:var(--txt)}
+.sec-cont ul{padding-left:19px;margin:7px 0}
+.sec-cont li{margin:5px 0}
+.buscador{
+  width:100%; background:var(--bg2); border:1px solid var(--line); border-radius:9px;
+  padding:9px 12px; margin-bottom:11px; outline:none;
+}
+.buscador:focus{border-color:var(--acc)}
+mark{background:rgba(227,179,65,.32); color:#ffe9a8; border-radius:3px; padding:0 2px}
+
+/* ---------- formularios ---------- */
+.vista{position:absolute; inset:0; background:var(--bg); z-index:30; overflow-y:auto; display:none}
+.vista.act{display:block}
+.wrap{max-width:920px; margin:0 auto; padding:26px 22px 80px}
+.wrap h2{font-size:1.5em; margin:0 0 6px; font-weight:680}
+.wrap .sub{color:var(--txt2); margin:0 0 26px; line-height:1.6}
+.campo{margin-bottom:20px}
+.campo label{display:block; font-weight:620; margin-bottom:5px; font-size:.95em}
+.campo .ayuda{color:var(--txt3); font-size:.85em; margin:0 0 7px; line-height:1.5}
+.campo input[type=text],.campo input[type=password],.campo textarea,.campo select{
+  width:100%; background:var(--bg2); border:1px solid var(--line); border-radius:9px;
+  padding:10px 12px; outline:none; line-height:1.55; resize:vertical;
+}
+.campo textarea{min-height:110px; font-family:inherit}
+.campo input:focus,.campo textarea:focus,.campo select:focus{border-color:var(--acc)}
+.fila{display:flex; gap:12px; flex-wrap:wrap}
+.fila > *{flex:1 1 200px}
+.check{display:flex; align-items:flex-start; gap:10px; margin-bottom:13px; cursor:pointer}
+.check input{margin-top:3px; width:16px; height:16px; accent-color:var(--acc); flex:0 0 auto}
+.check span b{display:block; font-weight:600}
+.check span i{color:var(--txt3); font-style:normal; font-size:.87em; line-height:1.5; display:block; margin-top:2px}
+.nota{
+  background:var(--bg2); border-left:3px solid var(--acc); border-radius:0 9px 9px 0;
+  padding:12px 15px; margin:16px 0; font-size:.91em; line-height:1.65; color:var(--txt2);
+}
+.nota.aviso{border-left-color:var(--warn)}
+.nota b{color:var(--txt)}
+.acciones{display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; padding-top:20px; border-top:1px solid var(--line)}
+.aviso-linea{
+  padding:9px 14px; font-size:.88em; background:rgba(227,179,65,.12);
+  color:#f0d492; border-bottom:1px solid rgba(227,179,65,.25); display:none;
+}
+.aviso-linea.act{display:block}
+.aviso-linea.malo{background:rgba(248,81,73,.13); color:#ff9d96; border-bottom-color:rgba(248,81,73,.3)}
+.aviso-linea a{color:inherit}
+.pie-preg{
+  display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--line); background:var(--bg2); flex:0 0 auto;
+}
+.pie-preg input{
+  flex:1; background:var(--bg3); border:1px solid var(--line); border-radius:9px; padding:9px 12px; outline:none;
+}
+.pie-preg input:focus{border-color:var(--acc)}
+.paso{counter-increment:p; margin:0 0 14px; padding-left:34px; position:relative; line-height:1.65}
+.paso::before{
+  content:counter(p); position:absolute; left:0; top:0; width:23px; height:23px; border-radius:50%;
+  background:var(--acc); color:#fff; display:grid; place-items:center; font-size:.75em; font-weight:700;
+}
+ol.pasos{counter-reset:p; list-style:none; padding:0; margin:14px 0}
+code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em; font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+@media (max-width:860px){ main{grid-template-columns:1fr} .col-apoyo{border-top:1px solid var(--line)} }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="marca">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#4c8dff" stroke-width="2" stroke-linecap="round">
+      <path d="M12 3v10"/><path d="M8.5 6.5v3.5"/><path d="M15.5 6.5v3.5"/>
+      <path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/>
+    </svg>
+    <span>Copiloto</span>
+  </div>
+
+  <button class="btn rec" id="btnEscuchar">● Iniciar escucha <kbd>E</kbd></button>
+  <button class="btn pri" id="btnResponder">Responder <kbd>R</kbd></button>
+
+  <div class="estado"><span class="luz" id="luz"></span><span id="txtEstado">Detenido</span></div>
+
+  <div class="sep"></div>
+
+  <button class="btn mini" id="btnVista" title="Alternar columnas">◧ Vista</button>
+  <button class="btn mini" id="btnSoloEs" title="Mostrar u ocultar el inglés">EN/ES</button>
+  <button class="btn mini" id="btnMenos" title="Achicar letra">A−</button>
+  <button class="btn mini" id="btnMas" title="Agrandar letra">A+</button>
+  <button class="btn mini" id="btnPerfil">Perfil</button>
+  <button class="btn mini" id="btnAjustes">Ajustes</button>
+</header>
+
+<div class="aviso-linea" id="aviso"></div>
+
+<main id="main">
+  <!-- ================= COLUMNA EN VIVO ================= -->
+  <section class="col col-vivo">
+    <div class="col-cab">
+      <span class="col-tit">Entrevista en vivo</span>
+      <div class="sep"></div>
+      <button class="btn mini" id="btnExportar">Exportar</button>
+      <button class="btn mini" id="btnLimpiar">Limpiar</button>
+    </div>
+    <div class="cuerpo" id="cuerpoVivo">
+      <div class="vacio" id="vacioVivo">
+        <h3>Todavía no estás escuchando</h3>
+        Pulsá <b>Iniciar escucha</b> y hablá (o dejá que hable tu entrevistador).<br>
+        Cada frase en inglés aparece acá con su traducción al español debajo.<br><br>
+        <span style="color:#4d5769">Antes de la primera entrevista: cargá tu perfil y tu clave en <b>Ajustes</b>.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= COLUMNA DE APOYO ================= -->
+  <section class="col col-apoyo">
+    <div class="col-cab">
+      <div class="tabs">
+        <button class="tab act" data-panel="pRespuesta">Respuesta</button>
+        <button class="tab" data-panel="pSpeech">Mi speech</button>
+        <button class="tab" data-panel="pChuletas">Chuletas</button>
+      </div>
+      <div class="sep"></div>
+      <button class="btn mini" id="btnAmpliar" style="display:none">Ampliar</button>
+    </div>
+
+    <div class="cuerpo" id="cuerpoApoyo">
+      <!-- respuesta sugerida -->
+      <div class="panel act" id="pRespuesta">
+        <div class="vacio" id="vacioRta">
+          <h3>Acá aparece qué contestar</h3>
+          Cuando el entrevistador haga una pregunta, pulsá <b>Responder</b> (o la tecla <b>R</b>)
+          y armo una respuesta en inglés apoyada en tu CV y tu proyecto.<br><br>
+          <span style="color:#4d5769">También podés escribir la pregunta abajo.</span>
+        </div>
+        <div id="contRta"></div>
+      </div>
+
+      <!-- speech preparado -->
+      <div class="panel" id="pSpeech">
+        <input class="buscador" id="buscarSpeech" placeholder="Buscar en el speech (logros, empresas, cifras…)">
+        <div id="contSpeech"></div>
+      </div>
+
+      <!-- chuletas -->
+      <div class="panel" id="pChuletas">
+        <div class="tarjeta">
+          <h4>Frases para ganar tiempo</h4>
+          <div class="rta" id="contFrases"></div>
+        </div>
+        <div class="tarjeta">
+          <h4>Mis notas fijas</h4>
+          <p class="ayuda" style="color:#6b7889;font-size:.85em;margin:0 0 8px">
+            Se guardan en esta computadora y quedan siempre a mano.
+          </p>
+          <textarea id="notasFijas" style="width:100%;min-height:150px;background:var(--bg3);border:1px solid var(--line);border-radius:9px;padding:10px 12px;outline:none;line-height:1.6;resize:vertical"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <form class="pie-preg" id="formPregunta">
+      <input id="inpPregunta" placeholder="Escribí una pregunta o un tema y armo la respuesta…" autocomplete="off">
+      <button class="btn pri" type="submit">Armar</button>
+    </form>
+  </section>
+</main>
+
+<!-- ================= VISTA PERFIL ================= -->
+<div class="vista" id="vistaPerfil">
+  <div class="wrap">
+    <h2>Tu perfil</h2>
+    <p class="sub">
+      Todo esto es la materia prima con la que armo tus respuestas. Cuanto más concreto
+      (cifras, nombres de empresas, resultados), mejor sale el speech. Se guarda solo en esta computadora.
+    </p>
+
+    <div class="fila">
+      <div class="campo"><label>Nombre</label><input type="text" id="pfNombre" placeholder="Cómo te presentás"></div>
+      <div class="campo"><label>Puesto al que aplicás</label><input type="text" id="pfPuesto" placeholder="Ej: Head of Operations"></div>
+      <div class="campo"><label>Empresa</label><input type="text" id="pfEmpresa" placeholder="Ej: Acme Corp"></div>
+    </div>
+
+    <div class="campo">
+      <label>CV / trayectoria</label>
+      <p class="ayuda">Pegá tu CV completo en texto, o subí el PDF y lo transcribo yo.</p>
+      <textarea id="pfCv" style="min-height:200px" placeholder="Experiencia, empresas, años, responsabilidades, estudios…"></textarea>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input type="file" id="filePdf" accept=".pdf,.txt,.md" style="display:none">
+        <button class="btn mini" id="btnSubirCv">Subir CV (PDF o texto)</button>
+        <span id="estadoCv" style="color:#6b7889;font-size:.85em"></span>
+      </div>
+    </div>
+
+    <div class="campo">
+      <label>Logros con números</label>
+      <p class="ayuda">Lo que más peso tiene en una entrevista. Uno por línea.</p>
+      <textarea id="pfLogros" placeholder="Reduje 22% el costo logístico en 8 meses&#10;Lideré un equipo de 14 personas en 3 países&#10;Abrí la operación de Chile: de 0 a USD 4M en 2 años"></textarea>
+    </div>
+
+    <div class="campo">
+      <label>Mi proyecto de outplacement</label>
+      <p class="ayuda">
+        Pegá acá lo que ya trabajaste en tu proceso de outplacement: tu propuesta de valor,
+        el pitch, el relato de la salida de tu último trabajo, tu objetivo profesional, el mapa de competencias.
+        Es lo que hace que las respuestas suenen a vos y no a un genérico.
+      </p>
+      <textarea id="pfProyecto" style="min-height:180px" placeholder="Propuesta de valor, pitch, objetivo, competencias, relato de transición…"></textarea>
+    </div>
+
+    <div class="campo">
+      <label>Descripción del puesto (job description)</label>
+      <p class="ayuda">Pegá el aviso o la descripción. Alineo cada respuesta con lo que están buscando.</p>
+      <textarea id="pfJd" placeholder="Responsabilidades, requisitos, sobre la empresa…"></textarea>
+    </div>
+
+    <div class="campo">
+      <label>Glosario propio</label>
+      <p class="ayuda">Términos, siglas y nombres que la traducción debe respetar. Formato <code>inglés = español</code>, uno por línea.</p>
+      <textarea id="pfGlosario" style="min-height:90px" placeholder="supply chain = cadena de suministro&#10;stakeholder = parte interesada&#10;churn = tasa de bajas"></textarea>
+    </div>
+
+    <div class="acciones">
+      <button class="btn pri" id="btnGuardarPerfil">Guardar perfil</button>
+      <button class="btn" id="btnGenerarSpeech">Generar mi speech</button>
+      <div class="sep"></div>
+      <button class="btn mini" id="btnExportarPerfil">Exportar .json</button>
+      <input type="file" id="fileImportar" accept=".json" style="display:none">
+      <button class="btn mini" id="btnImportarPerfil">Importar .json</button>
+      <button class="btn mini" id="btnCerrarPerfil">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= VISTA AJUSTES ================= -->
+<div class="vista" id="vistaAjustes">
+  <div class="wrap">
+    <h2>Ajustes</h2>
+    <p class="sub">Configuración de una sola vez. Todo queda guardado en esta computadora.</p>
+
+    <div class="campo">
+      <label>Clave de la API de Claude</label>
+      <p class="ayuda">
+        Se guarda solo en este navegador y viaja únicamente a la API de Anthropic.
+        La sacás de <code>console.anthropic.com</code> → API Keys.
+      </p>
+      <input type="password" id="cfClave" placeholder="sk-ant-…">
+    </div>
+
+    <div class="fila">
+      <div class="campo">
+        <label>Modelo</label>
+        <select id="cfModelo">
+          <option value="claude-opus-5">Claude Opus 5 (recomendado)</option>
+          <option value="claude-sonnet-5">Claude Sonnet 5 (más barato)</option>
+          <option value="claude-haiku-4-5">Claude Haiku 4.5 (el más rápido y barato)</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label>Idioma del entrevistador</label>
+        <select id="cfIdiomaOrigen">
+          <option value="en-US">Inglés (EE.UU.)</option>
+          <option value="en-GB">Inglés (Reino Unido)</option>
+          <option value="en-AU">Inglés (Australia)</option>
+          <option value="en-IN">Inglés (India)</option>
+          <option value="pt-BR">Portugués (Brasil)</option>
+        </select>
+      </div>
+    </div>
+
+    <label class="check"><input type="checkbox" id="cfTraducir" checked>
+      <span><b>Traducir en simultáneo</b><i>Cada frase se traduce apenas se cierra. Desactivalo si solo querés la transcripción.</i></span></label>
+
+    <label class="check"><input type="checkbox" id="cfAutoResponder">
+      <span><b>Responder solo cuando detecto una pregunta</b><i>Arma la respuesta sin que pulses nada. Cómodo, pero gasta más y a veces se dispara de más.</i></span></label>
+
+    <label class="check"><input type="checkbox" id="cfRapido">
+      <span><b>Modo rápido</b><i>Genera hasta 2,5× más rápido con Opus 5, a precio premium. Útil si sentís que la respuesta llega tarde.</i></span></label>
+
+    <div class="nota">
+      <b>Cuánto cuesta.</b> Una entrevista de 45 minutos con traducción continua y unas 15 respuestas
+      ronda <b>USD 1 a 3</b> con Opus 5. Con Haiku 4.5 baja a centavos, con algo menos de finura en el armado.
+      El modo rápido aproximadamente duplica el costo.
+    </div>
+
+    <h2 style="font-size:1.15em;margin:34px 0 6px">De dónde sale el audio</h2>
+    <p class="sub" style="margin-bottom:14px">
+      La transcripción escucha el <b>micrófono que tenga seleccionado tu Mac</b>. De eso depende todo lo demás.
+    </p>
+
+    <div class="nota aviso">
+      <b>Opción rápida (cero instalación).</b> Poné la entrevista por los parlantes del iMac y dejá que
+      el micrófono la levante. Funciona, pero también te transcribe a vos y pierde calidad si hay ruido.
+    </div>
+
+    <div class="nota">
+      <b>Opción recomendada: BlackHole (gratis).</b> Le da al copiloto el audio limpio de la reunión.
+      <ol class="pasos">
+        <li class="paso">Instalá <code>BlackHole 2ch</code> desde existential.audio (o con <code>brew install blackhole-2ch</code>).</li>
+        <li class="paso">Abrí <b>Configuración de Audio MIDI</b> → <b>+</b> → <b>Crear dispositivo de salida múltiple</b>, y tildá tus parlantes/auriculares <i>y</i> BlackHole 2ch. Así vos seguís escuchando.</li>
+        <li class="paso">En Zoom/Meet/Teams poné como <b>altavoz</b> ese dispositivo múltiple.</li>
+        <li class="paso">En <b>Ajustes del sistema → Sonido → Entrada</b>, elegí <b>BlackHole 2ch</b>.</li>
+        <li class="paso">Volvé acá y pulsá <b>Iniciar escucha</b>: vas a ver solo lo que dice el entrevistador.</li>
+      </ol>
+      Ojo: mientras BlackHole sea tu entrada, tu micrófono real no va a la reunión. Para hablar,
+      volvé a elegir tu micrófono en la reunión (Zoom mantiene su propia selección de micrófono).
+    </div>
+
+    <div class="acciones">
+      <button class="btn pri" id="btnGuardarAjustes">Guardar</button>
+      <button class="btn" id="btnProbar">Probar la conexión</button>
+      <div class="sep"></div>
+      <button class="btn mini" id="btnBorrarTodo" style="color:#ff9d96">Borrar todos mis datos</button>
+      <button class="btn mini" id="btnCerrarAjustes">Cerrar</button>
+    </div>
+    <p style="color:#6b7889;font-size:.84em;line-height:1.65;margin-top:22px">
+      Nada de esto se sube a ningún servidor propio: el perfil, el speech y la transcripción viven en
+      el almacenamiento local de este navegador. El texto de la entrevista se envía a la API de Anthropic
+      para traducirlo y armar respuestas. Grabar o transcribir una conversación puede requerir el
+      consentimiento de la otra parte según dónde estés.
+    </p>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   Copiloto de Entrevista — traducción simultánea + respuestas con tu perfil
+   Todo corre en el navegador. Los datos quedan en localStorage.
+   ========================================================================= */
+
+const SDK_URL = './vendor/anthropic.mjs';   // SDK oficial de Anthropic, copia local (ver vendor/LEEME.md)
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+
+/* ------------------------------ almacenamiento ------------------------- */
+const NS = 'copiloto.';
+const store = {
+  get(k, def){ try{ const v = localStorage.getItem(NS+k); return v==null ? def : JSON.parse(v); }catch(e){ return def; } },
+  set(k, v){ try{ localStorage.setItem(NS+k, JSON.stringify(v)); }catch(e){ avisar('No pude guardar: el almacenamiento está lleno.', true); } },
+  del(k){ localStorage.removeItem(NS+k); }
+};
+
+const CFG_DEF = {
+  clave:'', modelo:'claude-opus-5', idiomaOrigen:'en-US',
+  traducir:true, autoResponder:false, rapido:false,
+  fs:1, soloEs:false, vista:0, notas:''
+};
+const PERFIL_DEF = { nombre:'', puesto:'', empresa:'', cv:'', logros:'', proyecto:'', jd:'', glosario:'' };
+
+let cfg    = Object.assign({}, CFG_DEF, store.get('cfg', {}));
+let perfil = Object.assign({}, PERFIL_DEF, store.get('perfil', {}));
+let speech = store.get('speech', null);          // { fecha, texto }
+let lineas = store.get('lineas', []);            // transcripción de la sesión
+
+/* ------------------------------ utilidades ----------------------------- */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const hora = ts => new Date(ts).toLocaleTimeString('es', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+
+/* markdown mínimo: **negrita**, _cursiva_, viñetas y párrafos */
+function md(t){
+  const inline = s => esc(s)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[\s(])_([^_]+)_/g, '$1<em>$2</em>');
+  const out = []; let ul = false;
+  for (const raw of String(t||'').split('\n')){
+    const l = raw.trim();
+    if (!l){ if (ul){ out.push('</ul>'); ul=false; } continue; }
+    if (/^[-*•]\s+/.test(l)){
+      if (!ul){ out.push('<ul>'); ul=true; }
+      out.push('<li>'+inline(l.replace(/^[-*•]\s+/,''))+'</li>');
+    } else {
+      if (ul){ out.push('</ul>'); ul=false; }
+      out.push('<p>'+inline(l)+'</p>');
+    }
+  }
+  if (ul) out.push('</ul>');
+  return out.join('');
+}
+
+let avisoTimer = null;
+function avisar(msg, malo){
+  const el = $('#aviso');
+  el.textContent = msg;
+  el.classList.toggle('malo', !!malo);
+  el.classList.add('act');
+  clearTimeout(avisoTimer);
+  avisoTimer = setTimeout(()=> el.classList.remove('act'), malo ? 12000 : 6000);
+}
+
+/* ================================ CLAUDE ================================ */
+let Anthropic = null, cliente = null, claveCliente = '';
+/* 0 = todo (fallbacks + esfuerzo), 1 = solo esfuerzo, 2 = pelado.
+   Si la API rechaza un parámetro, bajamos un escalón y no volvemos a intentarlo. */
+let nivelParams = 0;
+
+const CON_ESFUERZO = new Set(['claude-opus-5','claude-sonnet-5']);
+const CON_RAPIDO   = new Set(['claude-opus-5']);
+const CON_FALLBACK = new Set(['claude-opus-5']);
+
+async function getCliente(){
+  if (!cfg.clave) throw new Error('Falta la clave de la API. Entrá a Ajustes y pegala.');
+  if (!Anthropic){
+    try {
+      const mod = await import(SDK_URL);
+      Anthropic = mod.default || mod.Anthropic;
+    } catch(e){
+      throw new Error('No pude cargar la librería de Claude (vendor/anthropic.mjs). ¿Está completo el archivo?');
+    }
+  }
+  if (!cliente || claveCliente !== cfg.clave){
+    cliente = new Anthropic({ apiKey: cfg.clave, dangerouslyAllowBrowser: true });
+    claveCliente = cfg.clave;
+  }
+  return cliente;
+}
+
+function extras(nivel, esfuerzo){
+  const m = cfg.modelo, e = {}, betas = [];
+  if (nivel <= 1 && esfuerzo && CON_ESFUERZO.has(m)) e.output_config = { effort: esfuerzo };
+  if (nivel === 0){
+    if (CON_FALLBACK.has(m)){ betas.push('server-side-fallback-2026-07-01'); e.fallbacks = 'default'; }
+    if (cfg.rapido && CON_RAPIDO.has(m)){ betas.push('fast-mode-2026-02-01'); e.speed = 'fast'; }
+  }
+  if (betas.length) e.betas = betas;
+  return e;
+}
+
+const esErrorDeParametro = err => {
+  const s = String(err && (err.message || err));
+  return /400|invalid_request|unsupported|unexpected|not supported|beta/i.test(s);
+};
+
+/**
+ * Llama a Claude en streaming. Devuelve el texto completo.
+ * onDelta(textoAcumulado) se dispara con cada fragmento.
+ */
+async function pedir({ system, messages, maxTokens=1500, esfuerzo=null, onDelta=null, signal=null }){
+  const cli = await getCliente();
+  for (let nivel = nivelParams; nivel <= 2; nivel++){
+    let acumulado = '';
+    try {
+      const params = { model: cfg.modelo, max_tokens: maxTokens, messages, ...extras(nivel, esfuerzo) };
+      if (system) params.system = system;
+      const stream = cli.beta.messages.stream(params, signal ? { signal } : undefined);
+      for await (const ev of stream){
+        if (ev.type === 'content_block_delta' && ev.delta.type === 'text_delta'){
+          acumulado += ev.delta.text;
+          if (onDelta) onDelta(acumulado);
+        }
+      }
+      const fin = await stream.finalMessage();
+      if (fin.stop_reason === 'refusal'){
+        throw new Error('Claude no pudo responder a ese contenido. Probá reformular la pregunta.');
+      }
+      nivelParams = nivel;
+      return acumulado;
+    } catch(err){
+      if (signal && signal.aborted) throw err;
+      if (nivel < 2 && !acumulado && esErrorDeParametro(err)){ continue; }   // degradamos y reintentamos
+      throw traducirError(err);
+    }
+  }
+}
+
+function traducirError(err){
+  const s = String(err && (err.message || err));
+  if (/401|authentication|invalid x-api-key/i.test(s)) return new Error('La clave de la API no es válida. Revisala en Ajustes.');
+  if (/429|rate_limit/i.test(s))                        return new Error('Demasiadas peticiones seguidas. Esperá unos segundos.');
+  if (/credit|billing|402/i.test(s))                    return new Error('La cuenta de Anthropic no tiene crédito disponible.');
+  if (/Failed to fetch|NetworkError|Connection error|ERR_/i.test(s)) return new Error('No pude conectarme con la API de Anthropic. Revisá tu conexión.');
+  return err instanceof Error ? err : new Error(s);
+}
+
+/* ============================ PERFIL COMO CONTEXTO ====================== */
+function bloquePerfil(){
+  const p = perfil, t = [];
+  if (p.nombre)   t.push('NOMBRE: ' + p.nombre);
+  if (p.puesto)   t.push('PUESTO AL QUE APLICA: ' + p.puesto);
+  if (p.empresa)  t.push('EMPRESA: ' + p.empresa);
+  if (p.cv)       t.push('\n=== CV / TRAYECTORIA ===\n' + p.cv);
+  if (p.logros)   t.push('\n=== LOGROS CON NÚMEROS ===\n' + p.logros);
+  if (p.proyecto) t.push('\n=== PROYECTO DE OUTPLACEMENT (propuesta de valor, pitch, objetivo) ===\n' + p.proyecto);
+  if (p.jd)       t.push('\n=== DESCRIPCIÓN DEL PUESTO ===\n' + p.jd);
+  return t.join('\n');
+}
+const hayPerfil = () => !!(perfil.cv || perfil.proyecto || perfil.logros);
+
+function glosario(){
+  const g = (perfil.glosario||'').split('\n').map(l=>l.trim()).filter(l=>l.includes('='));
+  return g.length ? '\n\nRespetá este glosario del usuario:\n' + g.join('\n') : '';
+}
+
+/* Sistema para respuestas: la parte pesada (el perfil) va cacheada. */
+function systemRespuesta(){
+  const p = perfil;
+  const instrucciones =
+`Sos el copiloto de ${p.nombre || 'un candidato'} durante una entrevista laboral en inglés${p.puesto ? ' para el puesto de ' + p.puesto : ''}${p.empresa ? ' en ' + p.empresa : ''}.
+Te paso lo que acaba de preguntar el entrevistador y tenés que darle, en segundos, qué contestar.
+
+Reglas:
+- La respuesta va EN INGLÉS, en primera persona, con el tono de alguien senior, cálido y concreto. Nada de jerga vacía.
+- Apoyate ÚNICAMENTE en los datos del perfil. Si algo no está, no lo inventes: preferí una formulación honesta y general antes que un dato falso.
+- Priorizá siempre un logro con número por sobre una declaración de intenciones.
+- Cuando la pregunta pida una experiencia, usá estructura STAR comprimida (situación, qué hiciste, resultado).
+- Máximo 120 palabras en inglés. Está pensado para leerse de reojo, no para recitarse.
+
+Formato exacto de tu salida, sin encabezados extra:
+**Opener:** <una frase para arrancar>
+- <punto clave 1>
+- <punto clave 2>
+- <punto clave 3>
+**Close:** <una frase para cerrar>
+_ES: <una línea en español con la idea central, para que la chequee de un vistazo>_`;
+
+  const perf = bloquePerfil();
+  if (!perf) return instrucciones + '\n\n(El usuario todavía no cargó su perfil: respondé de forma genérica y sugerile completarlo.)';
+  return [
+    { type:'text', text: instrucciones },
+    { type:'text', text: '\n=== PERFIL DEL CANDIDATO ===\n' + perf, cache_control:{ type:'ephemeral' } }
+  ];
+}
+
+/* ============================ RECONOCIMIENTO DE VOZ ==================== */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, escuchando = false, arrancando = false, wakeLock = null;
+let buffer = '', bufferTimer = null;
+
+const RE_PREGUNTA = /(^|\s)(what|how|why|when|where|who|which|whose|can you|could you|would you|will you|do you|did you|does|have you|has|are you|is there|is it|tell me|walk me|describe|explain|give me|talk about|share|any experience|what's|how's|why's)\b/i;
+const esPregunta = t => /\?\s*$/.test(t.trim()) || RE_PREGUNTA.test(t.trim().slice(0, 60));
+
+function iniciarEscucha(){
+  if (!SR){
+    avisar('Este navegador no reconoce voz. Usá Google Chrome en tu Mac.', true);
+    return;
+  }
+  rec = new SR();
+  rec.lang = cfg.idiomaOrigen;
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.maxAlternatives = 1;
+
+  rec.onstart = () => { arrancando = false; pintarEstado('on', 'Escuchando'); };
+
+  rec.onresult = e => {
+    let interina = '';
+    for (let i = e.resultIndex; i < e.results.length; i++){
+      const r = e.results[i];
+      if (r.isFinal) alBuffer(r[0].transcript);
+      else interina += r[0].transcript;
+    }
+    pintarInterina(interina);
+  };
+
+  rec.onerror = e => {
+    if (e.error === 'no-speech' || e.error === 'aborted') return;
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed'){
+      detenerEscucha();
+      avisar('El navegador bloqueó el micrófono. Permitilo en el candado de la barra de direcciones.', true);
+    } else if (e.error === 'audio-capture'){
+      detenerEscucha();
+      avisar('No encuentro entrada de audio. Revisá Ajustes del sistema → Sonido → Entrada.', true);
+    } else if (e.error === 'network'){
+      pintarEstado('wait', 'Reconectando…');
+    }
+  };
+
+  /* Chrome corta el reconocimiento cada tanto: lo reenganchamos solo. */
+  rec.onend = () => {
+    if (!escuchando) { pintarEstado('', 'Detenido'); return; }
+    pintarEstado('wait', 'Reenganchando…');
+    setTimeout(arrancarRec, 250);
+  };
+
+  escuchando = true;
+  $('#btnEscuchar').textContent = '■ Detener';
+  $('#btnEscuchar').classList.remove('rec');
+  arrancarRec();
+  pedirWakeLock();
+}
+
+function arrancarRec(){
+  if (!escuchando || arrancando || !rec) return;
+  arrancando = true;
+  try { rec.start(); }
+  catch(e){ arrancando = false; if (escuchando) setTimeout(arrancarRec, 600); }
+}
+
+function detenerEscucha(){
+  escuchando = false;
+  vaciarBuffer();
+  try { rec && rec.stop(); } catch(e){}
+  rec = null;
+  pintarInterina('');
+  pintarEstado('', 'Detenido');
+  const b = $('#btnEscuchar');
+  b.innerHTML = '● Iniciar escucha <kbd>E</kbd>';
+  b.classList.add('rec');
+  if (wakeLock){ try{ wakeLock.release(); }catch(e){} wakeLock = null; }
+}
+
+async function pedirWakeLock(){
+  try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch(e){}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && escuchando && !wakeLock) pedirWakeLock();
+});
+
+/* Agrupa los fragmentos sueltos de Chrome en frases con sentido. */
+function alBuffer(txt){
+  buffer = (buffer + ' ' + txt).replace(/\s+/g,' ').trim();
+  clearTimeout(bufferTimer);
+  if (/[.?!…]["')]?$/.test(buffer) || buffer.length > 240) vaciarBuffer();
+  else bufferTimer = setTimeout(vaciarBuffer, 1500);
+}
+function vaciarBuffer(){
+  clearTimeout(bufferTimer);
+  const t = buffer.trim();
+  buffer = '';
+  if (t.length > 1) agregarLinea(t);
+}
+
+function pintarEstado(clase, txt){
+  $('#luz').className = 'luz ' + clase;
+  $('#txtEstado').textContent = txt;
+}
+
+/* ============================== TRANSCRIPCIÓN ========================== */
+let ultimaPregunta = null;
+let autoTimer = null;
+
+function agregarLinea(texto){
+  const l = { id: 'l'+Date.now()+Math.random().toString(36).slice(2,6), ts: Date.now(), en: texto, es: '', preg: esPregunta(texto) };
+  lineas.push(l);
+  if (lineas.length > 400) lineas.splice(0, lineas.length - 400);
+  pintarLinea(l);
+  guardarLineas();
+  if (l.preg) ultimaPregunta = l;
+  if (cfg.traducir && cfg.clave) encolar(l);
+  if (l.preg && cfg.autoResponder && cfg.clave){
+    clearTimeout(autoTimer);
+    autoTimer = setTimeout(() => responder(l.en), 900);
+  }
+}
+
+let guardarTimer = null;
+function guardarLineas(){
+  clearTimeout(guardarTimer);
+  guardarTimer = setTimeout(() => store.set('lineas', lineas.slice(-200)), 1200);
+}
+
+function pintarLinea(l){
+  $('#vacioVivo').style.display = 'none';
+  const div = document.createElement('div');
+  div.className = 'linea' + (l.preg ? ' preg' : '');
+  div.id = l.id;
+  div.innerHTML =
+    '<p class="en">' + esc(l.en) + '</p>' +
+    '<p class="es ' + (l.es ? '' : 'pend') + '" data-es>' + (l.es ? esc(l.es) : (cfg.traducir && cfg.clave ? 'traduciendo…' : '')) + '</p>' +
+    '<div class="meta"><span class="hora">' + hora(l.ts) + '</span>' +
+      (l.preg ? '<span class="chip">pregunta</span><button class="btn mini" data-responder="'+l.id+'">Responder esto</button>' : '') +
+    '</div>';
+  const cont = $('#cuerpoVivo');
+  cont.insertBefore(div, $('#interina') || null);
+  autoScroll(cont);
+}
+
+function pintarInterina(txt){
+  let el = $('#interina');
+  if (!txt){ if (el) el.remove(); return; }
+  if (!el){
+    el = document.createElement('div');
+    el.id = 'interina'; el.className = 'interina';
+    $('#cuerpoVivo').appendChild(el);
+  }
+  el.textContent = txt;
+  autoScroll($('#cuerpoVivo'));
+}
+
+/* Solo seguimos el scroll si el usuario está mirando el final. */
+function autoScroll(cont){
+  const cerca = cont.scrollHeight - cont.scrollTop - cont.clientHeight < 260;
+  if (cerca) cont.scrollTop = cont.scrollHeight;
+}
+
+/* ============================== TRADUCCIÓN ============================= */
+const cola = []; let activos = 0;
+const NOMBRE_IDIOMA = { en:'inglés', pt:'portugués' };
+
+function encolar(l){ cola.push(l); bombear(); }
+function bombear(){
+  while (activos < 2 && cola.length){
+    const l = cola.shift(); activos++;
+    traducir(l).catch(e => {
+      const el = document.querySelector('#'+l.id+' [data-es]');
+      if (el){ el.textContent = '— ' + e.message; el.classList.add('pend'); }
+      avisar(e.message, true);
+    }).finally(() => { activos--; bombear(); });
+  }
+}
+
+async function traducir(l){
+  const idioma = NOMBRE_IDIOMA[(cfg.idiomaOrigen||'en').slice(0,2)] || 'inglés';
+  const system =
+`Sos intérprete simultáneo en una entrevista de trabajo. Traducís del ${idioma} al español neutro rioplatense.
+Devolvés ÚNICAMENTE la traducción: sin comillas, sin notas, sin repetir el original, sin explicar nada.
+Mantené el registro y el tono. Si la frase viene cortada, traducí igual lo que haya.` + glosario();
+
+  const i = lineas.indexOf(l);
+  const previas = (i > 0 ? lineas.slice(Math.max(0, i - 2), i) : [])
+    .filter(p => p.es).map(p => p.en + ' → ' + p.es).join('\n');
+
+  const el = document.querySelector('#'+l.id+' [data-es]');
+  const txt = await pedir({
+    system,
+    maxTokens: 700,
+    esfuerzo: 'low',
+    messages: [{ role:'user', content:
+      (previas ? '<contexto_previo>\n' + previas + '\n</contexto_previo>\n\n' : '') +
+      '<frase>\n' + l.en + '\n</frase>' }],
+    onDelta: t => { if (el){ el.textContent = t; el.classList.remove('pend'); autoScroll($('#cuerpoVivo')); } }
+  });
+  l.es = txt.trim();
+  if (el){ el.textContent = l.es; el.classList.remove('pend'); }
+  guardarLineas();
+}
+
+/* ============================ RESPUESTA EN VIVO ======================== */
+let ctrlRta = null, histRta = null;
+
+async function responder(pregunta){
+  if (!cfg.clave){ abrirVista('#vistaAjustes'); avisar('Primero pegá tu clave de la API en Ajustes.', true); return; }
+  pregunta = (pregunta || '').trim();
+  if (!pregunta){
+    const ult = ultimaPregunta || lineas[lineas.length-1];
+    if (!ult){ avisar('Todavía no hay nada que responder.'); return; }
+    pregunta = ult.en;
+  }
+  activarPanel('pRespuesta');
+  if (ctrlRta) ctrlRta.abort();
+  ctrlRta = new AbortController();
+
+  $('#vacioRta').style.display = 'none';
+  const cont = $('#contRta');
+  cont.innerHTML =
+    '<div class="pregunta-eco"><b>Pregunta:</b> ' + esc(pregunta) + '</div>' +
+    '<div class="tarjeta"><h4>Qué contestar <span class="cargando"><i></i><i></i><i></i></span></h4>' +
+    '<div class="rta" id="cuerpoRta"></div></div>';
+  $('#cuerpoApoyo').scrollTop = 0;
+  $('#btnAmpliar').style.display = 'none';
+
+  const contexto = lineas.slice(-6).map(x => x.en).join(' ');
+  const mensajes = [{ role:'user', content:
+    '<contexto_de_la_charla>\n' + contexto + '\n</contexto_de_la_charla>\n\n' +
+    '<pregunta_del_entrevistador>\n' + pregunta + '\n</pregunta_del_entrevistador>' }];
+
+  try {
+    const txt = await pedir({
+      system: systemRespuesta(), messages: mensajes, maxTokens: 1200, esfuerzo: 'low',
+      signal: ctrlRta.signal,
+      onDelta: t => { $('#cuerpoRta').innerHTML = md(t); }
+    });
+    $('#cuerpoRta').innerHTML = md(txt);
+    $('.tarjeta .cargando') && $('.tarjeta .cargando').remove();
+    histRta = mensajes.concat([{ role:'assistant', content: txt }]);
+    $('#btnAmpliar').style.display = '';
+  } catch(e){
+    if (ctrlRta.signal.aborted) return;
+    $('#cuerpoRta').innerHTML = '<p style="color:#ff9d96">' + esc(e.message) + '</p>';
+    const c = document.querySelector('.tarjeta .cargando'); if (c) c.remove();
+  }
+}
+
+async function ampliar(){
+  if (!histRta) return;
+  const cont = $('#contRta');
+  const extra = document.createElement('div');
+  extra.className = 'tarjeta';
+  extra.innerHTML = '<h4>Versión larga <span class="cargando"><i></i><i></i><i></i></span></h4><div class="rta" id="cuerpoAmp"></div>';
+  cont.appendChild(extra);
+  $('#btnAmpliar').disabled = true;
+  const msgs = histRta.concat([{ role:'user', content:
+    'Ampliá la respuesta: contame la historia completa en inglés con estructura STAR (situación, tarea, acción, resultado con número), en no más de 200 palabras, lista para decir en voz alta. Después agregá una línea "_ES: …_" con la idea en español.' }]);
+  try {
+    const t = await pedir({ system: systemRespuesta(), messages: msgs, maxTokens: 1600, esfuerzo: 'low',
+      onDelta: x => { $('#cuerpoAmp').innerHTML = md(x); } });
+    $('#cuerpoAmp').innerHTML = md(t);
+  } catch(e){
+    $('#cuerpoAmp').innerHTML = '<p style="color:#ff9d96">' + esc(e.message) + '</p>';
+  } finally {
+    const c = extra.querySelector('.cargando'); if (c) c.remove();
+    $('#btnAmpliar').disabled = false;
+  }
+}
+
+/* =============================== MI SPEECH ============================= */
+const SECCIONES_PEDIDAS = [
+  'Tell me about yourself — pitch de 60 segundos',
+  'Why this role / why this company',
+  'Mis tres fortalezas, cada una con una evidencia concreta',
+  'Mi punto débil y qué hice al respecto',
+  'Por qué dejé mi último trabajo (relato de transición, en positivo)',
+  'Cinco historias STAR listas para usar',
+  'Las preguntas difíciles más probables para este puesto, con respuesta breve',
+  'Expectativa salarial y cómo negociarla',
+  'Las preguntas que yo hago al final',
+  'Cierre: cómo pedir el próximo paso'
+];
+
+async function generarSpeech(){
+  if (!cfg.clave){ abrirVista('#vistaAjustes'); avisar('Primero pegá tu clave de la API en Ajustes.', true); return; }
+  if (!hayPerfil()){ avisar('Cargá al menos tu CV o tu proyecto de outplacement antes de generar el speech.', true); return; }
+
+  activarPanel('pSpeech');
+  cerrarVistas();
+  const cont = $('#contSpeech');
+  cont.innerHTML = '<div class="tarjeta"><h4>Armando tu speech <span class="cargando"><i></i><i></i><i></i></span></h4>' +
+                   '<div class="rta" id="speechStream" style="color:#9aa7b8;font-size:.95em"></div></div>';
+
+  const system =
+`Sos coach de entrevistas y armás el material de respaldo de ${perfil.nombre || 'un candidato'} para una entrevista en inglés${perfil.puesto ? ' para el puesto de ' + perfil.puesto : ''}${perfil.empresa ? ' en ' + perfil.empresa : ''}.
+
+Escribí un documento de respaldo que va a estar abierto en pantalla durante la entrevista: se lee de reojo, no se recita.
+
+Reglas:
+- El texto que el candidato va a decir va EN INGLÉS, en primera persona.
+- Debajo de cada bloque en inglés, una línea corta en español que resuma la idea, así la ubica de un vistazo.
+- Todo tiene que salir del perfil. Prohibido inventar empresas, cifras, fechas o títulos. Si falta un dato, escribí [COMPLETAR: …].
+- Priorizá logros con números. Frases cortas, viñetas, nada de párrafos largos.
+- Alineá cada sección con la descripción del puesto cuando exista.
+
+Formato: markdown con una sección por tema, cada una empezando con "## " y el título en español. Usá exactamente estas secciones y en este orden:
+${SECCIONES_PEDIDAS.map((s,i)=>(i+1)+'. '+s).join('\n')}`;
+
+  try {
+    const txt = await pedir({
+      system: [{ type:'text', text: system },
+               { type:'text', text: '\n=== PERFIL DEL CANDIDATO ===\n' + bloquePerfil(), cache_control:{type:'ephemeral'} }],
+      messages: [{ role:'user', content: 'Armá mi documento de respaldo completo.' }],
+      maxTokens: 16000,
+      onDelta: t => { const e = $('#speechStream'); if (e){ e.textContent = t.slice(-1200); } }
+    });
+    speech = { fecha: Date.now(), texto: txt };
+    store.set('speech', speech);
+    pintarSpeech();
+    avisar('Speech listo. Queda guardado hasta que lo vuelvas a generar.');
+  } catch(e){
+    cont.innerHTML = '<div class="tarjeta"><p style="color:#ff9d96">' + esc(e.message) + '</p></div>';
+  }
+}
+
+function pintarSpeech(){
+  const cont = $('#contSpeech');
+  if (!speech){
+    cont.innerHTML = '<div class="vacio"><h3>Todavía no generaste tu speech</h3>' +
+      'Cargá tu perfil y pulsá <b>Generar mi speech</b>. Te dejo pitch, historias STAR,<br>' +
+      'preguntas difíciles y cierre, en inglés y con el resumen en español.<br><br>' +
+      '<button class="btn pri" onclick="document.querySelector(\'#btnPerfil\').click()">Abrir mi perfil</button></div>';
+    return;
+  }
+  const bloques = speech.texto.split(/\n(?=##\s)/).filter(b => b.trim());
+  cont.innerHTML =
+    '<p style="color:#6b7889;font-size:.83em;margin:0 0 12px">Generado el ' +
+      new Date(speech.fecha).toLocaleString('es') +
+      ' · <a href="#" id="regenerar" style="color:#4c8dff">regenerar</a></p>' +
+    bloques.map((b, i) => {
+      const lineas = b.split('\n');
+      const tit = lineas[0].replace(/^##\s*/, '').replace(/^\d+[.)]\s*/, '');
+      return '<details class="sec"' + (i === 0 ? ' open' : '') + '>' +
+        '<summary><span class="num">' + (i+1) + '</span>' + esc(tit) + '</summary>' +
+        '<div class="sec-cont">' + md(lineas.slice(1).join('\n')) + '</div></details>';
+    }).join('');
+  const r = $('#regenerar');
+  if (r) r.onclick = e => { e.preventDefault(); generarSpeech(); };
+}
+
+/* Buscador dentro del speech */
+function buscarEnSpeech(q){
+  q = q.trim();
+  $$('#contSpeech details').forEach(d => {
+    d.querySelectorAll('mark').forEach(m => m.replaceWith(document.createTextNode(m.textContent)));
+    d.normalize();
+    if (!q){ d.style.display = ''; d.open = false; return; }
+    const hay = d.textContent.toLowerCase().includes(q.toLowerCase());
+    d.style.display = hay ? '' : 'none';
+    d.open = hay;
+    if (hay) resaltar(d.querySelector('.sec-cont'), q);
+  });
+}
+function resaltar(nodo, q){
+  if (!nodo) return;
+  const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+  const it = document.createTreeWalker(nodo, NodeFilter.SHOW_TEXT);
+  const objetivo = [];
+  while (it.nextNode()) if (re.test(it.currentNode.nodeValue)) objetivo.push(it.currentNode);
+  objetivo.forEach(t => {
+    const span = document.createElement('span');
+    span.innerHTML = esc(t.nodeValue).replace(re, '<mark>$1</mark>');
+    t.replaceWith(span);
+  });
+}
+
+/* =============================== CHULETAS ============================== */
+const FRASES = [
+  ['That\'s a great question — let me think for a second.', 'Buena pregunta, dejame pensarlo un segundo.'],
+  ['Could you rephrase that? I want to make sure I answer what you\'re asking.', '¿Podés reformularla? Quiero responder exactamente lo que me preguntás.'],
+  ['Let me give you a concrete example.', 'Te doy un ejemplo concreto.'],
+  ['To give you the short version first…', 'Te doy primero la versión corta…'],
+  ['I want to make sure I understood — you\'re asking about…?', 'Para asegurarme de que entendí, ¿me preguntás por…?'],
+  ['I don\'t have direct experience with that, but the closest thing I\'ve done is…', 'No tengo experiencia directa en eso, pero lo más parecido que hice fue…'],
+  ['Sorry, the audio cut out for a moment — could you repeat the last part?', 'Perdón, se cortó el audio un segundo, ¿podés repetir la última parte?'],
+  ['Happy to go deeper into any of that.', 'Con gusto profundizo en cualquiera de esos puntos.']
+];
+function pintarFrases(){
+  $('#contFrases').innerHTML = FRASES.map(([en, es]) =>
+    '<p style="margin:0 0 12px"><b style="color:#fff">' + esc(en) + '</b><br>' +
+    '<span style="color:#6b7889;font-size:.88em">' + esc(es) + '</span></p>').join('');
+}
+
+/* ================================ PERFIL =============================== */
+function cargarPerfilEnFormulario(){
+  $('#pfNombre').value   = perfil.nombre;
+  $('#pfPuesto').value   = perfil.puesto;
+  $('#pfEmpresa').value  = perfil.empresa;
+  $('#pfCv').value       = perfil.cv;
+  $('#pfLogros').value   = perfil.logros;
+  $('#pfProyecto').value = perfil.proyecto;
+  $('#pfJd').value       = perfil.jd;
+  $('#pfGlosario').value = perfil.glosario;
+}
+function guardarPerfil(){
+  perfil = {
+    nombre:$('#pfNombre').value.trim(), puesto:$('#pfPuesto').value.trim(), empresa:$('#pfEmpresa').value.trim(),
+    cv:$('#pfCv').value.trim(), logros:$('#pfLogros').value.trim(), proyecto:$('#pfProyecto').value.trim(),
+    jd:$('#pfJd').value.trim(), glosario:$('#pfGlosario').value.trim()
+  };
+  store.set('perfil', perfil);
+  avisar('Perfil guardado.');
+}
+
+function aBase64(buf){
+  const bytes = new Uint8Array(buf); let bin = ''; const paso = 0x8000;
+  for (let i = 0; i < bytes.length; i += paso) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + paso));
+  return btoa(bin);
+}
+
+async function importarCv(file){
+  const est = $('#estadoCv');
+  if (/\.(txt|md)$/i.test(file.name)){
+    $('#pfCv').value = await file.text();
+    est.textContent = 'Listo: ' + file.name;
+    return;
+  }
+  if (!cfg.clave){ est.textContent = 'Para leer un PDF necesito la clave de la API (Ajustes).'; return; }
+  est.textContent = 'Leyendo el PDF…';
+  try {
+    const b64 = aBase64(await file.arrayBuffer());
+    const txt = await pedir({
+      system: 'Transcribís currículums. Devolvés el contenido en texto plano, ordenado y completo, sin comentarios propios ni encabezados agregados.',
+      messages: [{ role:'user', content: [
+        { type:'document', source:{ type:'base64', media_type:'application/pdf', data:b64 } },
+        { type:'text', text:'Transcribí este CV completo a texto plano: experiencia con empresas, cargos, fechas y responsabilidades; formación; y todo dato numérico o de resultado que aparezca.' }
+      ]}],
+      maxTokens: 8000,
+      onDelta: t => { est.textContent = 'Leyendo… ' + t.length + ' caracteres'; }
+    });
+    $('#pfCv').value = txt.trim();
+    est.textContent = 'Listo: ' + file.name + '. Revisalo y guardá.';
+  } catch(e){ est.textContent = e.message; }
+}
+
+/* =============================== AJUSTES =============================== */
+function cargarAjustesEnFormulario(){
+  $('#cfClave').value        = cfg.clave;
+  $('#cfModelo').value       = cfg.modelo;
+  $('#cfIdiomaOrigen').value = cfg.idiomaOrigen;
+  $('#cfTraducir').checked   = cfg.traducir;
+  $('#cfAutoResponder').checked = cfg.autoResponder;
+  $('#cfRapido').checked     = cfg.rapido;
+}
+function guardarAjustes(){
+  cfg.clave        = $('#cfClave').value.trim();
+  cfg.modelo       = $('#cfModelo').value;
+  cfg.idiomaOrigen = $('#cfIdiomaOrigen').value;
+  cfg.traducir     = $('#cfTraducir').checked;
+  cfg.autoResponder= $('#cfAutoResponder').checked;
+  cfg.rapido       = $('#cfRapido').checked;
+  store.set('cfg', cfg);
+  nivelParams = 0; cliente = null;
+  if (rec && escuchando) rec.lang = cfg.idiomaOrigen;
+  avisar('Ajustes guardados.');
+}
+
+async function probarConexion(){
+  guardarAjustes();
+  const b = $('#btnProbar'); b.disabled = true; b.textContent = 'Probando…';
+  try {
+    const t = await pedir({ messages:[{ role:'user', content:'Respondé exactamente: listo' }], maxTokens: 20, esfuerzo:'low' });
+    avisar('Conexión correcta con ' + cfg.modelo + ' (' + t.trim().slice(0,40) + ').');
+  } catch(e){ avisar(e.message, true); }
+  finally { b.disabled = false; b.textContent = 'Probar la conexión'; }
+}
+
+/* ============================== VISTAS / UI ============================ */
+function abrirVista(sel){ cerrarVistas(); $(sel).classList.add('act'); }
+function cerrarVistas(){ $$('.vista').forEach(v => v.classList.remove('act')); }
+function activarPanel(id){
+  $$('.tab').forEach(t => t.classList.toggle('act', t.dataset.panel === id));
+  $$('.panel').forEach(p => p.classList.toggle('act', p.id === id));
+  const amp = $('#btnAmpliar');
+  amp.style.display = (id === 'pRespuesta' && histRta) ? '' : 'none';
+}
+function aplicarVista(){
+  const m = $('#main');
+  m.className = ['', 'solo-vivo', 'solo-apoyo'][cfg.vista] || '';
+}
+function aplicarFuente(){ document.documentElement.style.setProperty('--fs', cfg.fs); }
+function aplicarSoloEs(){ $('#cuerpoVivo').classList.toggle('solo-es', cfg.soloEs); }
+
+function exportar(){
+  const txt = lineas.map(l => '[' + hora(l.ts) + '] ' + l.en + (l.es ? '\n           ' + l.es : '')).join('\n\n');
+  const cab = 'Entrevista — ' + new Date().toLocaleString('es') +
+              (perfil.puesto ? '\nPuesto: ' + perfil.puesto : '') +
+              (perfil.empresa ? '\nEmpresa: ' + perfil.empresa : '') + '\n\n';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([cab + txt], { type:'text/plain;charset=utf-8' }));
+  a.download = 'entrevista-' + new Date().toISOString().slice(0,16).replace(/[:T]/g,'-') + '.txt';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/* ============================== EVENTOS =============================== */
+$('#btnEscuchar').onclick = () => escuchando ? detenerEscucha() : iniciarEscucha();
+$('#btnResponder').onclick = () => responder('');
+$('#btnAmpliar').onclick = ampliar;
+
+$('#btnVista').onclick = () => { cfg.vista = (cfg.vista + 1) % 3; store.set('cfg', cfg); aplicarVista(); };
+$('#btnSoloEs').onclick = () => { cfg.soloEs = !cfg.soloEs; store.set('cfg', cfg); aplicarSoloEs(); };
+$('#btnMas').onclick   = () => { cfg.fs = Math.min(1.8, +(cfg.fs + 0.1).toFixed(2)); store.set('cfg', cfg); aplicarFuente(); };
+$('#btnMenos').onclick = () => { cfg.fs = Math.max(0.8, +(cfg.fs - 0.1).toFixed(2)); store.set('cfg', cfg); aplicarFuente(); };
+
+$('#btnPerfil').onclick  = () => { cargarPerfilEnFormulario(); abrirVista('#vistaPerfil'); };
+$('#btnAjustes').onclick = () => { cargarAjustesEnFormulario(); abrirVista('#vistaAjustes'); };
+$('#btnCerrarPerfil').onclick  = cerrarVistas;
+$('#btnCerrarAjustes').onclick = cerrarVistas;
+$('#btnGuardarPerfil').onclick = guardarPerfil;
+$('#btnGuardarAjustes').onclick= guardarAjustes;
+$('#btnProbar').onclick        = probarConexion;
+$('#btnGenerarSpeech').onclick = () => { guardarPerfil(); generarSpeech(); };
+
+$('#btnSubirCv').onclick = () => $('#filePdf').click();
+$('#filePdf').onchange = e => { const f = e.target.files[0]; if (f) importarCv(f); e.target.value=''; };
+
+$('#btnExportarPerfil').onclick = () => {
+  guardarPerfil();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({ perfil, speech }, null, 2)], { type:'application/json' }));
+  a.download = 'perfil-entrevista.json'; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+};
+$('#btnImportarPerfil').onclick = () => $('#fileImportar').click();
+$('#fileImportar').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    perfil = Object.assign({}, PERFIL_DEF, d.perfil || d);
+    if (d.speech){ speech = d.speech; store.set('speech', speech); pintarSpeech(); }
+    store.set('perfil', perfil); cargarPerfilEnFormulario();
+    avisar('Perfil importado.');
+  } catch(err){ avisar('Ese archivo no tiene el formato esperado.', true); }
+  e.target.value = '';
+};
+
+$('#btnExportar').onclick = exportar;
+$('#btnLimpiar').onclick = () => {
+  if (!confirm('¿Borrar la transcripción de esta sesión? El perfil y el speech no se tocan.')) return;
+  store.del('lineas');
+  location.reload();
+};
+$('#btnBorrarTodo').onclick = () => {
+  if (!confirm('Esto borra tu perfil, tu speech, la clave guardada y la transcripción de esta computadora. ¿Seguro?')) return;
+  Object.keys(localStorage).filter(k => k.startsWith(NS)).forEach(k => localStorage.removeItem(k));
+  location.reload();
+};
+
+$$('.tab').forEach(t => t.onclick = () => activarPanel(t.dataset.panel));
+
+$('#formPregunta').onsubmit = e => {
+  e.preventDefault();
+  const v = $('#inpPregunta').value.trim();
+  if (!v) return;
+  $('#inpPregunta').value = '';
+  responder(v);
+};
+
+$('#cuerpoVivo').addEventListener('click', e => {
+  const b = e.target.closest('[data-responder]');
+  if (!b) return;
+  const l = lineas.find(x => x.id === b.dataset.responder);
+  if (l) responder(l.en);
+});
+
+$('#buscarSpeech').oninput = e => buscarEnSpeech(e.target.value);
+
+$('#notasFijas').value = cfg.notas || '';
+$('#notasFijas').oninput = e => { cfg.notas = e.target.value; store.set('cfg', cfg); };
+
+/* atajos de teclado */
+document.addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = e.target.tagName;
+  if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
+  const k = e.key.toLowerCase();
+  if (k === 'e'){ e.preventDefault(); $('#btnEscuchar').click(); }
+  else if (k === 'r'){ e.preventDefault(); responder(''); }
+  else if (k === '+' || k === '='){ $('#btnMas').click(); }
+  else if (k === '-'){ $('#btnMenos').click(); }
+  else if (k === 'escape'){ cerrarVistas(); }
+});
+
+/* ================================ INICIO ============================== */
+(function init(){
+  aplicarFuente(); aplicarVista(); aplicarSoloEs();
+  cargarAjustesEnFormulario(); cargarPerfilEnFormulario();
+  pintarFrases(); pintarSpeech();
+
+  if (lineas.length){
+    lineas.forEach(pintarLinea);
+    const ults = lineas.filter(l => l.preg);
+    ultimaPregunta = ults[ults.length - 1] || null;
+  }
+
+  if (!SR){
+    avisar('Este navegador no puede transcribir voz. Abrí el copiloto en Google Chrome.', true);
+  } else if (!cfg.clave){
+    avisar('Primer paso: pegá tu clave de la API en Ajustes y cargá tu perfil.');
+  }
+
+  if ('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
+})();
+</script>
+</body>
+</html>
