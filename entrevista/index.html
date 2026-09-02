@@ -478,11 +478,17 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
     <div class="acciones">
       <button class="btn pri" id="btnGuardarAjustes">Guardar</button>
       <button class="btn" id="btnProbar">Probar la conexión</button>
+      <button class="btn" id="btnActualizar">Buscar actualización</button>
       <div class="sep"></div>
       <button class="btn mini" id="btnBorrarTodo" style="color:#ff9d96">Borrar todos mis datos</button>
       <button class="btn mini" id="btnCerrarAjustes">Cerrar</button>
     </div>
     <p class="msg" id="msgAjustes"></p>
+    <p style="color:#6b7889;font-size:.84em;line-height:1.65;margin-top:22px">
+      Versión instalada: <b id="versionApp"></b>. La app guarda una copia en la computadora para
+      abrir al instante y sin conexión, así que una versión nueva puede tardar una apertura en
+      llegar. <b>Buscar actualización</b> la trae ahora mismo.
+    </p>
     <p style="color:#6b7889;font-size:.84em;line-height:1.65;margin-top:22px">
       Nada de esto se sube a ningún servidor propio: el perfil, el speech y la transcripción viven en
       el almacenamiento local de este navegador. El texto de la entrevista se envía a la API de Anthropic
@@ -498,6 +504,7 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
    Todo corre en el navegador. Los datos quedan en localStorage.
    ========================================================================= */
 
+const VERSION = 'v5';   // subir junto con CACHE en sw.js al publicar cambios
 const SDK_URL = './vendor/anthropic.mjs';   // SDK oficial de Anthropic, copia local (ver vendor/LEEME.md)
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -1018,7 +1025,7 @@ async function responder(pregunta){
    manda el modelo se convierte en una opción desplegable, lista para leer en
    voz alta. Conserva cuáles estaban abiertas mientras el texto sigue llegando. */
 function pintarRespuesta(txt){
-  const partes = String(txt || '').split(/\n(?=###\s)/);
+  const partes = String(txt || '').split(/\n(?=#{2,3}\s)/);
   $('#cuerpoRta').innerHTML = md(partes[0]);
 
   const cont = $('#opcionesRta');
@@ -1032,7 +1039,7 @@ function pintarRespuesta(txt){
     '<span>tocá una para desplegarla · teclas 1 a ' + Math.min(opciones.length, 9) + '</span></h4>' +
     opciones.map((o, i) => {
       const lineas = o.split('\n');
-      const tit = lineas[0].replace(/^###\s*/, '');
+      const tit = lineas[0].replace(/^#{2,3}\s*/, '');
       return '<details class="sec"' + (abiertas.has(i) ? ' open' : '') + '>' +
         '<summary><span class="num">' + (i+1) + '</span>' + esc(tit) + '</summary>' +
         '<div class="sec-cont rta">' + md(lineas.slice(1).join('\n')) + '</div></details>';
@@ -1286,6 +1293,34 @@ async function probarConexion(){
   finally { b.disabled = false; b.textContent = 'Probar la conexión'; }
 }
 
+/* Tira la copia guardada y vuelve a bajar todo. Es la salida cuando la app
+   quedó pegada a una versión vieja: el service worker responde primero con lo
+   que tiene, y recargar a mano no siempre lo saltea. */
+async function limpiarCopiaLocal(){
+  const hecho = { workers:0, caches:0 };
+  try {
+    if ('serviceWorker' in navigator){
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+      hecho.workers = regs.length;
+    }
+    if (window.caches){
+      const claves = await caches.keys();
+      await Promise.all(claves.map(k => caches.delete(k)));
+      hecho.caches = claves.length;
+    }
+  } catch(e){}
+  return hecho;
+}
+
+async function forzarActualizacion(){
+  const b = $('#btnActualizar');
+  b.disabled = true; b.textContent = 'Actualizando…';
+  msgEn('#msgAjustes', 'Borrando la copia guardada y bajando la versión nueva…', 'neutro');
+  await limpiarCopiaLocal();
+  location.reload();
+}
+
 /* ============================== VISTAS / UI ============================ */
 function abrirVista(sel){ cerrarVistas(); $(sel).classList.add('act'); }
 function cerrarVistas(){ $$('.vista').forEach(v => v.classList.remove('act')); }
@@ -1331,6 +1366,7 @@ $('#btnCerrarAjustes').onclick = cerrarVistas;
 $('#btnGuardarPerfil').onclick = guardarPerfil;
 $('#btnGuardarAjustes').onclick= guardarAjustes;
 $('#btnProbar').onclick        = probarConexion;
+$('#btnActualizar').onclick    = forzarActualizacion;
 $('#btnGenerarSpeech').onclick = () => { guardarPerfil(); generarSpeech(); };
 
 $('#btnSubirCv').onclick = () => $('#filePdf').click();
@@ -1426,8 +1462,13 @@ document.addEventListener('keydown', e => {
     avisar('Primer paso: pegá tu clave de la API en Ajustes y cargá tu perfil.');
   }
 
+  $('#versionApp').textContent = VERSION;
+
   if ('serviceWorker' in navigator){
     navigator.serviceWorker.register('sw.js').catch(()=>{});
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      avisar('Bajó una versión nueva del copiloto. Cerrá y volvé a abrir la app para usarla.');
+    });
   }
 })();
 </script>
