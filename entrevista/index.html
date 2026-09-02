@@ -190,6 +190,7 @@ mark{background:rgba(227,179,65,.32); color:#ffe9a8; border-radius:3px; padding:
 .nota b{color:var(--txt)}
 .acciones{display:flex; gap:10px; flex-wrap:wrap; margin-top:22px; padding-top:20px; border-top:1px solid var(--line)}
 .aviso-linea{
+  position:relative; z-index:40;
   padding:9px 14px; font-size:.88em; background:rgba(227,179,65,.12);
   color:#f0d492; border-bottom:1px solid rgba(227,179,65,.25); display:none;
 }
@@ -203,6 +204,11 @@ mark{background:rgba(227,179,65,.32); color:#ffe9a8; border-radius:3px; padding:
   flex:1; background:var(--bg3); border:1px solid var(--line); border-radius:9px; padding:9px 12px; outline:none;
 }
 .pie-preg input:focus{border-color:var(--acc)}
+.msg{margin:14px 0 0; font-size:.93em; line-height:1.55; display:none; font-weight:550}
+.msg.act{display:block}
+.msg.ok{color:var(--ok)}
+.msg.mal{color:var(--err)}
+.msg.neutro{color:var(--txt2); font-weight:450}
 .paso{counter-increment:p; margin:0 0 14px; padding-left:34px; position:relative; line-height:1.65}
 .paso::before{
   content:counter(p); position:absolute; left:0; top:0; width:23px; height:23px; border-radius:50%;
@@ -376,6 +382,7 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
       <button class="btn mini" id="btnImportarPerfil">Importar .json</button>
       <button class="btn mini" id="btnCerrarPerfil">Cerrar</button>
     </div>
+    <p class="msg" id="msgPerfil"></p>
   </div>
 </div>
 
@@ -460,6 +467,7 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
       <button class="btn mini" id="btnBorrarTodo" style="color:#ff9d96">Borrar todos mis datos</button>
       <button class="btn mini" id="btnCerrarAjustes">Cerrar</button>
     </div>
+    <p class="msg" id="msgAjustes"></p>
     <p style="color:#6b7889;font-size:.84em;line-height:1.65;margin-top:22px">
       Nada de esto se sube a ningún servidor propio: el perfil, el speech y la transcripción viven en
       el almacenamiento local de este navegador. El texto de la entrevista se envía a la API de Anthropic
@@ -522,6 +530,16 @@ function md(t){
   }
   if (ul) out.push('</ul>');
   return out.join('');
+}
+
+/* Aviso fijo dentro de un panel: la franja de arriba queda tapada por el
+   panel abierto, y justo ahí es donde el usuario está mirando. */
+function msgEn(sel, texto, tipo){
+  const el = $(sel);
+  if (!el) return;
+  el.textContent = texto;
+  el.className = 'msg act ' + (tipo || 'ok');
+  try { el.scrollIntoView({ block:'nearest' }); } catch(e){}
 }
 
 let avisoTimer = null;
@@ -611,6 +629,8 @@ async function pedir({ system, messages, maxTokens=1500, esfuerzo=null, onDelta=
 
 function traducirError(err){
   const s = String(err && (err.message || err));
+  if (/anthropic-workspace-id/i.test(s))
+    return new Error('Esa clave no quedó asignada a un workspace. Creá una nueva en platform.claude.com/settings/keys eligiendo un workspace (Default Workspace).');
   if (/401|authentication|invalid x-api-key/i.test(s)) return new Error('La clave de la API no es válida. Revisala en Ajustes.');
   if (/429|rate_limit/i.test(s))                        return new Error('Demasiadas peticiones seguidas. Esperá unos segundos.');
   if (/credit|billing|402/i.test(s))                    return new Error('La cuenta de Anthropic no tiene crédito disponible.');
@@ -1081,6 +1101,7 @@ function guardarPerfil(){
     jd:$('#pfJd').value.trim(), glosario:$('#pfGlosario').value.trim()
   };
   store.set('perfil', perfil);
+  msgEn('#msgPerfil', '✓ Perfil guardado.');
   avisar('Perfil guardado.');
 }
 
@@ -1134,16 +1155,22 @@ function guardarAjustes(){
   store.set('cfg', cfg);
   nivelParams = 0; cliente = null;
   if (rec && escuchando) rec.lang = cfg.idiomaOrigen;
+  msgEn('#msgAjustes', '✓ Ajustes guardados.');
   avisar('Ajustes guardados.');
 }
 
 async function probarConexion(){
   guardarAjustes();
   const b = $('#btnProbar'); b.disabled = true; b.textContent = 'Probando…';
+  msgEn('#msgAjustes', 'Probando la conexión con la API…', 'neutro');
   try {
-    const t = await pedir({ messages:[{ role:'user', content:'Respondé exactamente: listo' }], maxTokens: 20, esfuerzo:'low' });
-    avisar('Conexión correcta con ' + cfg.modelo + ' (' + t.trim().slice(0,40) + ').');
-  } catch(e){ avisar(e.message, true); }
+    await pedir({ messages:[{ role:'user', content:'Respondé exactamente: listo' }], maxTokens: 20, esfuerzo:'low' });
+    msgEn('#msgAjustes', '✓ Conexión correcta con ' + cfg.modelo + '. Ya podés cerrar Ajustes y cargar tu perfil.');
+    avisar('Conexión correcta con ' + cfg.modelo + '.');
+  } catch(e){
+    msgEn('#msgAjustes', '✕ ' + e.message, 'mal');
+    avisar(e.message, true);
+  }
   finally { b.disabled = false; b.textContent = 'Probar la conexión'; }
 }
 
@@ -1212,8 +1239,12 @@ $('#fileImportar').onchange = async e => {
     perfil = Object.assign({}, PERFIL_DEF, d.perfil || d);
     if (d.speech){ speech = d.speech; store.set('speech', speech); pintarSpeech(); }
     store.set('perfil', perfil); cargarPerfilEnFormulario();
+    msgEn('#msgPerfil', '✓ Perfil importado.');
     avisar('Perfil importado.');
-  } catch(err){ avisar('Ese archivo no tiene el formato esperado.', true); }
+  } catch(err){
+    msgEn('#msgPerfil', '✕ Ese archivo no tiene el formato esperado.', 'mal');
+    avisar('Ese archivo no tiene el formato esperado.', true);
+  }
   e.target.value = '';
 };
 
