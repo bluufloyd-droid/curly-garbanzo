@@ -1,0 +1,16 @@
+{
+  "name": "Copiloto de Entrevista",
+  "short_name": "Copiloto",
+  "description": "Traducción simultánea de la entrevista y respuestas de respaldo armadas con tu CV y tu proyecto de outplacement.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "orientation": "any",
+  "categories": ["productivity", "business"],
+  "icons": [
+    { "src": "icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
