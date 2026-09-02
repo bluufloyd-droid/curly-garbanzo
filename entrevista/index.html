@@ -208,6 +208,7 @@ mark{background:rgba(227,179,65,.32); color:#ffe9a8; border-radius:3px; padding:
   margin:20px 0 10px; font-size:.75em; text-transform:uppercase; letter-spacing:.09em;
   color:var(--txt3); font-weight:700; display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;
 }
+.tiempos{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:450;color:#4d5769;font-size:.92em;font-variant-numeric:tabular-nums}
 .tit-opciones span{text-transform:none; letter-spacing:0; font-weight:450; color:#4d5769; font-size:.92em}
 #opcionesRta .sec summary{font-weight:600}
 #opcionesRta .sec-cont{padding-top:8px}
@@ -504,7 +505,7 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
    Todo corre en el navegador. Los datos quedan en localStorage.
    ========================================================================= */
 
-const VERSION = 'v5';   // subir junto con CACHE en sw.js al publicar cambios
+const VERSION = 'v6';   // subir junto con CACHE en sw.js al publicar cambios
 const SDK_URL = './vendor/anthropic.mjs';   // SDK oficial de Anthropic, copia local (ver vendor/LEEME.md)
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -703,13 +704,23 @@ function bloquePerfil(){
 }
 const hayPerfil = () => !!(perfil.cv || perfil.proyecto || perfil.logros);
 
-function glosario(){
-  const g = (perfil.glosario||'').split('\n').map(l=>l.trim()).filter(l=>l.includes('='));
-  return g.length ? '\n\nRespetá este glosario del usuario:\n' + g.join('\n') : '';
+/* Manda solo los términos del glosario que aparecen en la frase. Con 200
+   términos, enviarlo entero era mandar 2000 tokens de diccionario para traducir
+   una oración de quince palabras, y eso se paga en segundos. */
+function glosario(frase){
+  const g = [...new Set((perfil.glosario||'').split('\n').map(l=>l.trim()).filter(l=>l.includes('=')))];
+  if (!g.length) return '';
+  if (!frase) return '\n\nRespetá este glosario del usuario:\n' + g.join('\n');
+  const f = ' ' + String(frase).toLowerCase().replace(/[^a-záéíóúñü0-9]+/g, ' ') + ' ';
+  const usar = g.filter(l => {
+    const en = l.split('=')[0].trim().toLowerCase();
+    return en.length > 2 && f.includes(' ' + en + ' ');
+  });
+  return usar.length ? '\n\nRespetá este glosario del usuario:\n' + usar.join('\n') : '';
 }
 
 /* Sistema para respuestas: la parte pesada (el perfil) va cacheada. */
-function systemRespuesta(){
+function systemRespuesta(modo){
   const p = perfil;
   const instrucciones =
 `Sos el copiloto de ${p.nombre || 'un candidato'} durante una entrevista laboral en inglés${p.puesto ? ' para el puesto de ' + p.puesto : ''}${p.empresa ? ' en ' + p.empresa : ''}.
@@ -724,8 +735,6 @@ Reglas:
 - Si la pregunta pide varias cosas (por ejemplo "tus fortalezas"), desarrollá TODAS, cada una con su evidencia propia. Nunca contestes con una sola cuando piden tres.
 
 FORMATO DE SALIDA — respetalo al pie de la letra, la pantalla lo parsea.
-
-Primero la respuesta principal, sin ningún encabezado antes:
 **Opener:** <una frase para arrancar>
 - <punto clave 1, con dato>
 - <punto clave 2, con dato>
@@ -734,19 +743,34 @@ Primero la respuesta principal, sin ningún encabezado antes:
 **Close:** <una frase para cerrar>
 _ES: <una línea en español con la idea central, para que la chequee de un vistazo>_
 
-Después, cuando la pregunta admita más de una historia o más de un ángulo —que es casi siempre— agregá 2 o 3 alternativas COMPLETAMENTE DESARROLLADAS. Cada una arranca con "### " al principio de una línea, y en ese mismo renglón va el título:
-### <nombre corto de la historia> · <en qué caso conviene esta y no otra>
-y debajo, la respuesta entera en inglés con exactamente el mismo formato que la principal: Opener, viñetas con datos, Close y la línea _ES:_.
+Nada más que eso. Sin encabezados, sin alternativas, sin comentarios: otra llamada se ocupa de las opciones.`;
 
-Cada alternativa tiene que estar lista para decirse tal cual, en voz alta, sin que el usuario tenga que completarla ni reescribirla. No es un resumen ni una nota: es otra respuesta posible a la misma pregunta. La elige de un vistazo por el título y la lee.
-No repitas en las alternativas la historia que ya usaste en la respuesta principal.
-Si la pregunta de verdad admite una sola respuesta (un dato puntual, un sí o un no), no inventes alternativas: devolvé solo la principal.`;
+  const alternativas =
+`Sos el copiloto de ${p.nombre || 'un candidato'} en una entrevista laboral en inglés${p.puesto ? ' para ' + p.puesto : ''}.
+Ya se le dio una respuesta a la pregunta del entrevistador. Tu tarea ahora es darle 2 o 3 RESPUESTAS ALTERNATIVAS, para que elija otra si la conversación va hacia otro lado.
+
+Reglas:
+- Cada alternativa es otra respuesta posible a la MISMA pregunta, apoyada en una historia o un ángulo distinto del perfil. Nunca repitas el de la respuesta que ya se dio.
+- Van en inglés, en primera persona, listas para decir en voz alta tal cual. No son resúmenes ni notas.
+- Solo datos del perfil. Nada inventado.
+- Si la pregunta admite una sola respuesta honesta, devolvé una sola alternativa o ninguna. No rellenes.
+
+FORMATO — respetalo al pie de la letra, la pantalla lo parsea. Cada alternativa arranca con "### " al principio de una línea:
+### <nombre corto de la historia o del ángulo> · <en qué caso conviene esta y no otra>
+**Opener:** <una frase>
+- <punto con dato>
+- <punto con dato>
+**Close:** <una frase>
+_ES: <una línea en español>_`;
 
   const perf = bloquePerfil();
-  if (!perf) return instrucciones + '\n\n(El usuario todavía no cargó su perfil: respondé de forma genérica y sugerile completarlo.)';
+  const texto = modo === 'alternativas' ? alternativas : instrucciones;
+  if (!perf) return texto + '\n\n(El usuario todavía no cargó su perfil: respondé de forma genérica y sugerile completarlo.)';
+  /* El perfil va PRIMERO y cacheado: la caché es por prefijo, así que poniéndolo
+     al frente la aprovechan tanto la respuesta principal como las alternativas. */
   return [
-    { type:'text', text: instrucciones },
-    { type:'text', text: '\n=== PERFIL DEL CANDIDATO ===\n' + perf, cache_control:{ type:'ephemeral' } }
+    { type:'text', text: '=== PERFIL DEL CANDIDATO ===\n' + perf, cache_control:{ type:'ephemeral' } },
+    { type:'text', text: '\n' + texto }
   ];
 }
 
@@ -950,7 +974,7 @@ async function traducir(l){
   const system =
 `Sos intérprete simultáneo en una entrevista de trabajo. Traducís del ${idioma} al español neutro rioplatense.
 Devolvés ÚNICAMENTE la traducción: sin comillas, sin notas, sin repetir el original, sin explicar nada.
-Mantené el registro y el tono. Si la frase viene cortada, traducí igual lo que haya.` + glosario();
+Mantené el registro y el tono. Si la frase viene cortada, traducí igual lo que haya.` + glosario(l.en);
 
   const i = lineas.indexOf(l);
   const previas = (i > 0 ? lineas.slice(Math.max(0, i - 2), i) : [])
@@ -1003,17 +1027,20 @@ async function responder(pregunta){
     '<contexto_de_la_charla>\n' + contexto + '\n</contexto_de_la_charla>\n\n' +
     '<pregunta_del_entrevistador>\n' + pregunta + '\n</pregunta_del_entrevistador>' }];
 
+  const t0 = Date.now(); let tPrimera = 0;
   try {
     const txt = await pedir({
-      system: systemRespuesta(), messages: mensajes, maxTokens: 4000, esfuerzo: 'low',
+      system: systemRespuesta('principal'), messages: mensajes, maxTokens: 1200, esfuerzo: 'low',
       signal: ctrlRta.signal,
       mudo: 40000,
-      onDelta: t => pintarRespuesta(t)
+      onDelta: t => { if (!tPrimera) tPrimera = Date.now() - t0; pintarPrincipal(t); }
     });
-    pintarRespuesta(txt);
-    $('.tarjeta .cargando') && $('.tarjeta .cargando').remove();
+    pintarPrincipal(txt);
+    const c = document.querySelector('.tarjeta .cargando'); if (c) c.remove();
+    marcarTiempos(tPrimera, Date.now() - t0);
     histRta = mensajes.concat([{ role:'assistant', content: txt }]);
     $('#btnAmpliar').style.display = '';
+    buscarAlternativas(mensajes, txt, ctrlRta.signal);   // no bloquea: ya puede leer
   } catch(e){
     if (ctrlRta.signal.aborted) return;
     $('#cuerpoRta').innerHTML = '<p style="color:#ff9d96">' + esc(e.message) + '</p>';
@@ -1024,14 +1051,17 @@ async function responder(pregunta){
 /* La respuesta principal va en la tarjeta de arriba; cada alternativa que
    manda el modelo se convierte en una opción desplegable, lista para leer en
    voz alta. Conserva cuáles estaban abiertas mientras el texto sigue llegando. */
-function pintarRespuesta(txt){
-  const partes = String(txt || '').split(/\n(?=#{2,3}\s)/);
-  $('#cuerpoRta').innerHTML = md(partes[0]);
+function pintarPrincipal(txt){
+  $('#cuerpoRta').innerHTML = md(String(txt || '').split(/\n(?=#{2,3}\s)/)[0]);
+}
 
+/* Las alternativas llegan en una segunda llamada, mientras el usuario ya está
+   leyendo la principal. Conserva cuáles estaban abiertas mientras sigue llegando. */
+function pintarOpciones(txt){
   const cont = $('#opcionesRta');
   if (!cont) return;
-  const opciones = partes.slice(1);
-  if (!opciones.length){ cont.innerHTML = ''; return; }
+  const opciones = String(txt || '').split(/\n(?=#{2,3}\s)/).filter(o => /^#{2,3}\s/.test(o));
+  if (!opciones.length){ return; }
 
   const abiertas = new Set([...cont.querySelectorAll('details')].map((d, i) => d.open ? i : -1));
   cont.innerHTML =
@@ -1052,6 +1082,39 @@ function alternarOpcion(n){
   if (!d) return;
   d.open = !d.open;
   if (d.open) d.scrollIntoView({ block:'nearest', behavior:'smooth' });
+}
+
+/* Segunda llamada, en paralelo a la lectura de la principal. Si falla o se
+   cancela, la respuesta principal ya está en pantalla y no se pierde nada. */
+async function buscarAlternativas(mensajes, principal, signal){
+  const cont = $('#opcionesRta');
+  if (!cont) return;
+  cont.innerHTML = '<h4 class="tit-opciones">Buscando otras opciones <span class="cargando"><i></i><i></i><i></i></span></h4>';
+  try {
+    const txt = await pedir({
+      system: systemRespuesta('alternativas'),
+      messages: mensajes.concat([
+        { role:'assistant', content: principal },
+        { role:'user', content: 'Dame ahora las respuestas alternativas para la misma pregunta.' }
+      ]),
+      maxTokens: 2600, esfuerzo:'low', signal, mudo: 45000,
+      onDelta: t => pintarOpciones(t)
+    });
+    pintarOpciones(txt);
+    if (!cont.querySelector('details')) cont.innerHTML = '';
+  } catch(e){
+    if (signal && signal.aborted) return;
+    cont.innerHTML = '<h4 class="tit-opciones">No pude traer alternativas esta vez</h4>';
+  }
+}
+
+function marcarTiempos(primera, total){
+  const h = document.querySelector('.tarjeta h4');
+  if (!h) return;
+  const s = document.createElement('span');
+  s.className = 'tiempos';
+  s.textContent = (primera/1000).toFixed(1) + ' s a la primera palabra · ' + (total/1000).toFixed(1) + ' s completa';
+  h.appendChild(s);
 }
 
 async function ampliar(){
