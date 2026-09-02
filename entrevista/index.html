@@ -406,6 +406,34 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
     <p class="sub">Configuración de una sola vez. Todo queda guardado en esta computadora.</p>
 
     <div class="campo">
+      <label>Motor de escucha</label>
+      <p class="ayuda">
+        Chrome no necesita nada, pero su reconocimiento se corta solo en sesiones largas y entrega el
+        texto con retraso. Deepgram transcribe en streaming: parciales cada pocas décimas, sin cortes,
+        y con el micrófono elegido a mano acá abajo. Cuesta unos 29 centavos de dólar por hora, y la
+        cuenta nueva viene con USD 200 de crédito: unas 690 horas sin pagar nada.
+      </p>
+      <select id="cfMotor">
+        <option value="chrome">Chrome — gratis, sin configurar</option>
+        <option value="deepgram">Deepgram Nova-3 — streaming (recomendado)</option>
+      </select>
+    </div>
+
+    <div class="campo" id="campoDeepgram">
+      <label>Clave de Deepgram</label>
+      <p class="ayuda">Se saca en <code>console.deepgram.com</code>. Se guarda solo en esta computadora.</p>
+      <input type="password" id="cfClaveDeepgram" placeholder="Pegá acá tu clave de Deepgram">
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="cfDispositivo" style="flex:1 1 260px"><option value="">Micrófono predeterminado</option></select>
+        <button class="btn mini" id="btnDispositivos">Buscar micrófonos</button>
+      </div>
+      <p class="ayuda" style="margin-top:8px">
+        Elegí <b>BlackHole 2ch</b> acá y se acabó el enredo de la selección de micrófono de Chrome:
+        con este motor el dispositivo se pide por código.
+      </p>
+    </div>
+
+    <div class="campo">
       <label>Clave de la API de Claude</label>
       <p class="ayuda">
         Se guarda solo en este navegador y viaja únicamente a la API de Anthropic.
@@ -517,7 +545,7 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
    Todo corre en el navegador. Los datos quedan en localStorage.
    ========================================================================= */
 
-const VERSION = 'v9';   // subir junto con CACHE en sw.js al publicar cambios
+const VERSION = 'v10';   // subir junto con CACHE en sw.js al publicar cambios
 const SDK_URL = './vendor/anthropic.mjs';   // SDK oficial de Anthropic, copia local (ver vendor/LEEME.md)
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -531,7 +559,8 @@ const store = {
 };
 
 const CFG_DEF = {
-  clave:'', modelo:'claude-opus-5', modeloTraduccion:'claude-haiku-4-5', idiomaOrigen:'en-US',
+  clave:'', claveDeepgram:'', motor:'chrome', dispositivo:'',
+  modelo:'claude-opus-5', modeloTraduccion:'claude-haiku-4-5', idiomaOrigen:'en-US',
   traducir:true, anticipada:true, autoResponder:false, rapido:false,
   fs:1, soloEs:false, vista:0, notas:''
 };
@@ -786,16 +815,180 @@ _ES: <una línea en español>_`;
   ];
 }
 
+/* ========================= MOTOR DEEPGRAM (STREAMING) ==================
+   Transcripción en streaming por WebSocket. Reemplaza al reconocimiento de
+   Chrome, que entrega el texto tarde y se corta solo en sesiones largas.
+   Tres ventajas, no una: parciales cada pocas décimas, sin cortes, y el
+   micrófono se elige por código en vez de depender de la selección que Chrome
+   guarda por sitio.
+   El navegador no puede mandar cabeceras en un WebSocket, así que la clave va
+   como subprotocolo, que es el mecanismo que Deepgram documenta para el caso. */
+const DG_URL = 'wss://api.deepgram.com/v1/listen';
+let dgWs = null, dgCtx = null, dgStream = null, dgNodo = null, dgLatido = null;
+let dgFinales = '';
+
+const PCM_WORKLET = `
+class PCM extends AudioWorkletProcessor {
+  process(entradas){
+    const canal = entradas[0] && entradas[0][0];
+    if (canal){
+      const pcm = new Int16Array(canal.length);
+      for (let i = 0; i < canal.length; i++){
+        const m = Math.max(-1, Math.min(1, canal[i]));
+        pcm[i] = m < 0 ? m * 0x8000 : m * 0x7FFF;
+      }
+      this.port.postMessage(pcm.buffer, [pcm.buffer]);
+    }
+    return true;
+  }
+}
+registerProcessor('pcm', PCM);`;
+
+async function listarDispositivos(){
+  try {
+    const permiso = await navigator.mediaDevices.getUserMedia({ audio:true });
+    permiso.getTracks().forEach(t => t.stop());   // solo para que aparezcan los nombres
+  } catch(e){}
+  try { return (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput'); }
+  catch(e){ return []; }
+}
+
+async function pintarDispositivos(){
+  const sel = $('#cfDispositivo');
+  if (!sel || sel.dataset.listo) return;
+  const ds = await listarDispositivos();
+  if (!ds.length) return;
+  sel.innerHTML = '<option value="">Micrófono predeterminado</option>' +
+    ds.map(d => '<option value="' + esc(d.deviceId) + '">' + esc(d.label || 'Entrada sin nombre') + '</option>').join('');
+  sel.value = cfg.dispositivo || '';
+  sel.dataset.listo = '1';
+}
+
+function mostrarCampoDeepgram(){
+  const c = $('#campoDeepgram');
+  if (c) c.style.display = $('#cfMotor').value === 'deepgram' ? '' : 'none';
+}
+
+async function iniciarDeepgram(){
+  if (!cfg.claveDeepgram) throw new Error('Falta la clave de Deepgram. Cargala en Ajustes.');
+
+  dgStream = await navigator.mediaDevices.getUserMedia({
+    audio: Object.assign(
+      { echoCancellation:false, noiseSuppression:false, autoGainControl:false },
+      cfg.dispositivo ? { deviceId: { exact: cfg.dispositivo } } : {})
+  });
+
+  dgCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const url = URL.createObjectURL(new Blob([PCM_WORKLET], { type:'application/javascript' }));
+  await dgCtx.audioWorklet.addModule(url);
+  URL.revokeObjectURL(url);
+
+  const params = new URLSearchParams({
+    model: 'nova-3',
+    language: (cfg.idiomaOrigen || 'en-US').slice(0,2),
+    encoding: 'linear16',
+    sample_rate: String(dgCtx.sampleRate),
+    channels: '1',
+    interim_results: 'true',
+    punctuate: 'true',
+    smart_format: 'true',
+    endpointing: '300',
+    utterance_end_ms: '1000',
+    vad_events: 'true'
+  });
+
+  dgWs = new WebSocket(DG_URL + '?' + params.toString(), ['token', cfg.claveDeepgram]);
+  dgWs.binaryType = 'arraybuffer';
+  dgFinales = '';
+
+  dgWs.onopen = () => {
+    pintarEstado('on', 'Escuchando · Deepgram');
+    const fuente = dgCtx.createMediaStreamSource(dgStream);
+    dgNodo = new AudioWorkletNode(dgCtx, 'pcm');
+    dgNodo.port.onmessage = ev => {
+      if (dgWs && dgWs.readyState === 1) dgWs.send(ev.data);
+    };
+    fuente.connect(dgNodo);
+    /* El worklet no produce salida: no se conecta al destino para no devolver
+       el audio a los parlantes y crear un lazo. */
+    clearInterval(dgLatido);
+    dgLatido = setInterval(() => {
+      if (dgWs && dgWs.readyState === 1) dgWs.send(JSON.stringify({ type:'KeepAlive' }));
+    }, 8000);
+  };
+
+  dgWs.onmessage = ev => {
+    let d; try { d = JSON.parse(ev.data); } catch(e){ return; }
+    if (d.type === 'UtteranceEnd'){ cerrarFraseDG(); return; }
+    if (d.type !== 'Results') return;
+    const alt = d.channel && d.channel.alternatives && d.channel.alternatives[0];
+    const t = (alt && alt.transcript || '').trim();
+    if (!t){ if (d.speech_final) cerrarFraseDG(); return; }
+    if (d.is_final){
+      dgFinales = (dgFinales + ' ' + t).trim();
+      if (d.speech_final) cerrarFraseDG();
+      else pintarInterina(dgFinales);
+    } else {
+      pintarInterina((dgFinales + ' ' + t).trim());
+    }
+  };
+
+  dgWs.onerror = () => {
+    avisar('Se cortó la conexión con Deepgram. Revisá la clave y tu internet.', true);
+  };
+
+  dgWs.onclose = ev => {
+    if (!escuchando) return;
+    if (ev.code === 1008 || ev.code === 4001 || ev.code === 1002){
+      detenerEscucha();
+      avisar('Deepgram rechazó la clave. Revisala en Ajustes.', true);
+      return;
+    }
+    pintarEstado('wait', 'Reconectando con Deepgram…');
+    setTimeout(() => { if (escuchando) iniciarDeepgram().catch(e => { detenerEscucha(); avisar(e.message, true); }); }, 1200);
+  };
+}
+
+function cerrarFraseDG(){
+  const t = dgFinales.trim();
+  dgFinales = '';
+  pintarInterina('');
+  if (t.length > 1) agregarLinea(t);
+}
+
+function pararDeepgram(){
+  clearInterval(dgLatido); dgLatido = null;
+  try { if (dgWs && dgWs.readyState === 1) dgWs.send(JSON.stringify({ type:'CloseStream' })); } catch(e){}
+  try { if (dgWs) { dgWs.onclose = null; dgWs.close(); } } catch(e){}
+  dgWs = null;
+  try { if (dgNodo) dgNodo.disconnect(); } catch(e){}
+  dgNodo = null;
+  try { if (dgStream) dgStream.getTracks().forEach(t => t.stop()); } catch(e){}
+  dgStream = null;
+  try { if (dgCtx) dgCtx.close(); } catch(e){}
+  dgCtx = null;
+  dgFinales = '';
+}
+
 /* ============================ RECONOCIMIENTO DE VOZ ==================== */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, escuchando = false, arrancando = false, wakeLock = null;
 let buffer = '', bufferTimer = null;
-let ultimoAudio = 0, vigilanteVoz = null;
+let ultimoAudio = 0, vigilanteVoz = null, refrescoVoz = null;
 
 const RE_PREGUNTA = /(^|\s)(what|how|why|when|where|who|which|whose|can you|could you|would you|will you|do you|did you|does|have you|has|are you|is there|is it|tell me|walk me|describe|explain|give me|talk about|share|any experience|what's|how's|why's)\b/i;
 const esPregunta = t => /\?\s*$/.test(t.trim()) || RE_PREGUNTA.test(t.trim().slice(0, 60));
 
 function iniciarEscucha(){
+  if (cfg.motor === 'deepgram'){
+    escuchando = true;
+    $('#btnEscuchar').textContent = '■ Detener';
+    $('#btnEscuchar').classList.remove('rec');
+    pintarEstado('wait', 'Conectando…');
+    pedirWakeLock();
+    iniciarDeepgram().catch(e => { detenerEscucha(); avisar(e.message, true); });
+    return;
+  }
   if (!SR){
     avisar('Este navegador no reconoce voz. Usá Google Chrome en tu Mac.', true);
     return;
@@ -852,12 +1045,20 @@ function iniciarEscucha(){
   clearInterval(vigilanteVoz);
   vigilanteVoz = setInterval(() => {
     if (!escuchando) return;
-    if (Date.now() - ultimoAudio > 20000){
+    if (Date.now() - ultimoAudio > 8000){
       ultimoAudio = Date.now();
       pintarEstado('wait', 'Reiniciando la escucha…');
       try { rec && rec.stop(); } catch(e){}   // onend vuelve a arrancarlo
     }
-  }, 5000);
+  }, 2000);
+
+  /* El reconocimiento de Chrome se degrada con los minutos aunque siga
+     entregando texto. Reciclarlo cada 45 s cuesta una pausa imperceptible y
+     evita el corte largo. */
+  clearInterval(refrescoVoz);
+  refrescoVoz = setInterval(() => {
+    if (escuchando && !buffer) { try { rec && rec.stop(); } catch(e){} }
+  }, 45000);
 }
 
 function arrancarRec(){
@@ -870,6 +1071,9 @@ function arrancarRec(){
 function detenerEscucha(){
   escuchando = false;
   clearInterval(vigilanteVoz); vigilanteVoz = null;
+  clearInterval(refrescoVoz); refrescoVoz = null;
+  pararDeepgram();
+  reiniciarAnticipada();
   vaciarBuffer();
   try { rec && rec.stop(); } catch(e){}
   rec = null;
@@ -1474,6 +1678,10 @@ async function importarCv(file){
 /* =============================== AJUSTES =============================== */
 function cargarAjustesEnFormulario(){
   $('#cfClave').value        = cfg.clave;
+  $('#cfClaveDeepgram').value = cfg.claveDeepgram;
+  $('#cfMotor').value        = cfg.motor;
+  pintarDispositivos();
+  mostrarCampoDeepgram();
   $('#cfModelo').value       = cfg.modelo;
   $('#cfModeloTraduccion').value = cfg.modeloTraduccion;
   $('#cfIdiomaOrigen').value = cfg.idiomaOrigen;
@@ -1484,6 +1692,9 @@ function cargarAjustesEnFormulario(){
 }
 function guardarAjustes(){
   cfg.clave        = $('#cfClave').value.trim();
+  cfg.claveDeepgram = $('#cfClaveDeepgram').value.trim();
+  cfg.motor        = $('#cfMotor').value;
+  cfg.dispositivo  = $('#cfDispositivo').value;
   cfg.modelo       = $('#cfModelo').value;
   cfg.modeloTraduccion = $('#cfModeloTraduccion').value;
   cfg.idiomaOrigen = $('#cfIdiomaOrigen').value;
@@ -1586,6 +1797,8 @@ $('#btnCerrarAjustes').onclick = cerrarVistas;
 $('#btnGuardarPerfil').onclick = guardarPerfil;
 $('#btnGuardarAjustes').onclick= guardarAjustes;
 $('#btnProbar').onclick        = probarConexion;
+$('#btnDispositivos').onclick  = () => { const s = $('#cfDispositivo'); delete s.dataset.listo; pintarDispositivos(); };
+$('#cfMotor').onchange         = mostrarCampoDeepgram;
 $('#btnActualizar').onclick    = forzarActualizacion;
 $('#btnGenerarSpeech').onclick = () => { guardarPerfil(); generarSpeech(); };
 
