@@ -93,6 +93,7 @@ main.solo-vivo .col-apoyo, main.solo-apoyo .col-vivo{display:none}
 .linea.preg .es{color:#cfe0ff}
 .linea .meta{display:flex;align-items:center;gap:8px;margin-top:6px}
 .hora{font-size:.72em;color:#4d5769;font-variant-numeric:tabular-nums}
+.ms{font-size:.72em;color:#4d5769;font-variant-numeric:tabular-nums;opacity:.75}
 .chip{
   font-size:.7em; text-transform:uppercase; letter-spacing:.06em; font-weight:700;
   background:rgba(76,141,255,.16); color:var(--acc2); padding:2px 7px; border-radius:20px;
@@ -505,7 +506,7 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
    Todo corre en el navegador. Los datos quedan en localStorage.
    ========================================================================= */
 
-const VERSION = 'v6';   // subir junto con CACHE en sw.js al publicar cambios
+const VERSION = 'v7';   // subir junto con CACHE en sw.js al publicar cambios
 const SDK_URL = './vendor/anthropic.mjs';   // SDK oficial de Anthropic, copia local (ver vendor/LEEME.md)
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -880,8 +881,11 @@ document.addEventListener('visibilitychange', () => {
 function alBuffer(txt){
   buffer = (buffer + ' ' + txt).replace(/\s+/g,' ').trim();
   clearTimeout(bufferTimer);
-  if (/[.?!…]["')]?$/.test(buffer) || buffer.length > 240) vaciarBuffer();
-  else bufferTimer = setTimeout(vaciarBuffer, 1500);
+  /* En vivo, esperar a que la frase cierre cuesta más de lo que mejora: una
+     cláusula suelta se traduce bien igual. Antes esperaba 1,5 s y eso solo se
+     sumaba al retraso de la API. */
+  if (/[.?!…,;:]["')]?$/.test(buffer) || buffer.length > 110) vaciarBuffer();
+  else bufferTimer = setTimeout(vaciarBuffer, 600);
 }
 function vaciarBuffer(){
   clearTimeout(bufferTimer);
@@ -959,7 +963,7 @@ const NOMBRE_IDIOMA = { en:'inglés', pt:'portugués' };
 
 function encolar(l){ cola.push(l); bombear(); }
 function bombear(){
-  while (activos < 2 && cola.length){
+  while (activos < 4 && cola.length){
     const l = cola.shift(); activos++;
     traducir(l).catch(e => {
       const el = document.querySelector('#'+l.id+' [data-es]');
@@ -970,6 +974,7 @@ function bombear(){
 }
 
 async function traducir(l){
+  const t0 = Date.now();
   const idioma = NOMBRE_IDIOMA[(cfg.idiomaOrigen||'en').slice(0,2)] || 'inglés';
   const system =
 `Sos intérprete simultáneo en una entrevista de trabajo. Traducís del ${idioma} al español neutro rioplatense.
@@ -994,6 +999,13 @@ Mantené el registro y el tono. Si la frase viene cortada, traducí igual lo que
   });
   l.es = txt.trim();
   if (el){ el.textContent = l.es; el.classList.remove('pend'); }
+  const meta = document.querySelector('#'+l.id+' .meta');
+  if (meta && !meta.querySelector('.ms')){
+    const m = document.createElement('span');
+    m.className = 'ms';
+    m.textContent = ((Date.now()-t0)/1000).toFixed(1) + ' s';
+    meta.appendChild(m);
+  }
   guardarLineas();
 }
 
