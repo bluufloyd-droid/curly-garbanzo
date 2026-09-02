@@ -545,7 +545,7 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
    Todo corre en el navegador. Los datos quedan en localStorage.
    ========================================================================= */
 
-const VERSION = 'v10';   // subir junto con CACHE en sw.js al publicar cambios
+const VERSION = 'v11';   // subir junto con CACHE en sw.js al publicar cambios
 const SDK_URL = './vendor/anthropic.mjs';   // SDK oficial de Anthropic, copia local (ver vendor/LEEME.md)
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -825,7 +825,7 @@ _ES: <una línea en español>_`;
    como subprotocolo, que es el mecanismo que Deepgram documenta para el caso. */
 const DG_URL = 'wss://api.deepgram.com/v1/listen';
 let dgWs = null, dgCtx = null, dgStream = null, dgNodo = null, dgLatido = null;
-let dgFinales = '';
+let dgFinales = '', dgEsAcum = '', dgCola = Promise.resolve();
 
 const PCM_WORKLET = `
 class PCM extends AudioWorkletProcessor {
@@ -925,11 +925,14 @@ async function iniciarDeepgram(){
     const t = (alt && alt.transcript || '').trim();
     if (!t){ if (d.speech_final) cerrarFraseDG(); return; }
     if (d.is_final){
+      /* Deepgram no vuelve a tocar un tramo que marcó final: se traduce una
+         sola vez, se agrega al final, y no se reescribe nunca. */
       dgFinales = (dgFinales + ' ' + t).trim();
+      encolarSegmento(t);
+      pintarEnCurso(dgFinales);
       if (d.speech_final) cerrarFraseDG();
-      else pintarInterina(dgFinales);
     } else {
-      pintarInterina((dgFinales + ' ' + t).trim());
+      pintarEnCurso((dgFinales + ' ' + t).trim());
     }
   };
 
@@ -949,11 +952,63 @@ async function iniciarDeepgram(){
   };
 }
 
-function cerrarFraseDG(){
-  const t = dgFinales.trim();
+/* La línea en curso: inglés arriba, español acumulado abajo. El español solo
+   crece; nunca se reescribe. */
+function pintarEnCurso(en){
+  let el = $('#interina');
+  if (!el){
+    el = document.createElement('div');
+    el.id = 'interina'; el.className = 'interina';
+    el.innerHTML = '<p class="en" data-ien></p><p class="es" data-ies></p>';
+    $('#cuerpoVivo').appendChild(el);
+  }
+  el.querySelector('[data-ien]').textContent = en;
+  el.querySelector('[data-ies]').textContent = dgEsAcum;
+  autoScroll($('#cuerpoVivo'));
+}
+
+/* Traduce un tramo ya cerrado y lo agrega al final de lo que hay. La cola es
+   secuencial para que los tramos no se adelanten unos a otros y el texto salga
+   en el orden en que se dijo. */
+function encolarSegmento(t){
+  if (!cfg.traducir || !cfg.clave || !t.trim()) return;
+  const contexto = dgFinales.slice(0, Math.max(0, dgFinales.length - t.length)).slice(-160).trim();
+  const idioma = NOMBRE_IDIOMA[(cfg.idiomaOrigen||'en').slice(0,2)] || 'inglés';
+  dgCola = dgCola.then(async () => {
+    const es = await pedir({
+      system:
+`Sos intérprete simultáneo en una entrevista de trabajo. Traducís del ${idioma} al español neutro rioplatense.
+Te llega un TRAMO de una frase que se está diciendo, junto con lo que se dijo antes.
+Traducí ÚNICAMENTE el tramo nuevo. El contexto previo es para que entiendas de qué se habla: no lo traduzcas ni lo repitas.
+No completes la idea ni adivines cómo sigue. Devolvés solamente la traducción del tramo.` + glosario(t),
+      modelo: cfg.modeloTraduccion || cfg.modelo,
+      messages: [{ role:'user', content:
+        (contexto ? '<ya_dicho>\n' + contexto + '\n</ya_dicho>\n\n' : '') +
+        '<tramo_nuevo>\n' + t.trim() + '\n</tramo_nuevo>' }],
+      maxTokens: 500, esfuerzo: 'low', mudo: 15000,
+      onDelta: p => { const el = document.querySelector('#interina [data-ies]');
+                      if (el) el.textContent = (dgEsAcum + ' ' + p).trim(); }
+    });
+    dgEsAcum = (dgEsAcum + ' ' + es.trim()).trim();
+    const el = document.querySelector('#interina [data-ies]');
+    if (el) el.textContent = dgEsAcum;
+  }).catch(() => {});
+  return dgCola;
+}
+
+/* Espera a que termine de traducirse el último tramo antes de crear la línea:
+   así la línea nace con la traducción completa y no hay que reescribirla.
+   El texto ya está a la vista mientras tanto, así que la espera no se percibe. */
+async function cerrarFraseDG(){
+  const en = dgFinales.trim();
+  if (en.length < 2){ dgFinales = ''; dgEsAcum = ''; pintarInterina(''); return; }
   dgFinales = '';
+  const cola = dgCola;
+  await cola;
+  const es = dgEsAcum.trim();
+  dgEsAcum = '';
   pintarInterina('');
-  if (t.length > 1) agregarLinea(t);
+  agregarLinea(en, es);
 }
 
 function pararDeepgram(){
@@ -967,7 +1022,7 @@ function pararDeepgram(){
   dgStream = null;
   try { if (dgCtx) dgCtx.close(); } catch(e){}
   dgCtx = null;
-  dgFinales = '';
+  dgFinales = ''; dgEsAcum = '';
 }
 
 /* ============================ RECONOCIMIENTO DE VOZ ==================== */
@@ -1118,8 +1173,9 @@ function pintarEstado(clase, txt){
 let ultimaPregunta = null;
 let autoTimer = null;
 
-function agregarLinea(texto){
-  const l = { id: 'l'+Date.now()+Math.random().toString(36).slice(2,6), ts: Date.now(), en: texto, es: '', preg: esPregunta(texto) };
+function agregarLinea(texto, esYaTraducido){
+  const l = { id: 'l'+Date.now()+Math.random().toString(36).slice(2,6), ts: Date.now(),
+              en: texto, es: esYaTraducido || '', preg: esPregunta(texto) };
   /* Lo que el usuario ya leyó mientras se hablaba se conserva tal cual: la
      línea definitiva arranca con eso y solo se le agrega lo que falte. */
   if (antEsFijado && texto.startsWith(antEnFijado.trim().slice(0, 40))){
@@ -1131,7 +1187,7 @@ function agregarLinea(texto){
   pintarLinea(l);
   guardarLineas();
   if (l.preg) ultimaPregunta = l;
-  if (cfg.traducir && cfg.clave) encolar(l);
+  if (!l.es && cfg.traducir && cfg.clave) encolar(l);
   if (l.preg && cfg.autoResponder && cfg.clave){
     clearTimeout(autoTimer);
     autoTimer = setTimeout(() => responder(l.en), 900);
@@ -1176,7 +1232,7 @@ function pintarInterina(txt){
   }
   el.querySelector('[data-ien]').textContent = txt;
   autoScroll($('#cuerpoVivo'));
-  if (cfg.anticipada && cfg.traducir && cfg.clave) programarAnticipada(txt);
+  if (cfg.motor !== 'deepgram' && cfg.anticipada && cfg.traducir && cfg.clave) programarAnticipada(txt);
 }
 
 function mostrarProvisional(txt){
