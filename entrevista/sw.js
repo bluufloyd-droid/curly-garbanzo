@@ -1,7 +1,7 @@
 /* Service worker del copiloto: deja la app instalada y lista para abrir al
    instante, y guarda la librería de Claude para no depender del CDN en el
    momento de la entrevista. Al publicar cambios hay que subir CACHE. */
-var CACHE = "copiloto-v8";
+var CACHE = "copiloto-v9";
 var ARCHIVOS = [
   "./", "./index.html", "./manifest.json", "./icono.svg",
   "./vendor/anthropic.mjs", "./vendor/buffer.mjs", "./vendor/process.mjs",
