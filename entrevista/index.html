@@ -204,6 +204,13 @@ mark{background:rgba(227,179,65,.32); color:#ffe9a8; border-radius:3px; padding:
   flex:1; background:var(--bg3); border:1px solid var(--line); border-radius:9px; padding:9px 12px; outline:none;
 }
 .pie-preg input:focus{border-color:var(--acc)}
+.tit-opciones{
+  margin:20px 0 10px; font-size:.75em; text-transform:uppercase; letter-spacing:.09em;
+  color:var(--txt3); font-weight:700; display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;
+}
+.tit-opciones span{text-transform:none; letter-spacing:0; font-weight:450; color:#4d5769; font-size:.92em}
+#opcionesRta .sec summary{font-weight:600}
+#opcionesRta .sec-cont{padding-top:8px}
 .msg{margin:14px 0 0; font-size:.93em; line-height:1.55; display:none; font-weight:550}
 .msg.act{display:block}
 .msg.ok{color:var(--ok)}
@@ -581,7 +588,11 @@ async function getCliente(){
     }
   }
   if (!cliente || claveCliente !== cfg.clave){
-    cliente = new Anthropic({ apiKey: cfg.clave, dangerouslyAllowBrowser: true });
+    cliente = new Anthropic({
+      apiKey: cfg.clave, dangerouslyAllowBrowser: true,
+      timeout: 60000,   // ms. El SDK espera 10 minutos por defecto: demasiado en vivo.
+      maxRetries: 1
+    });
     claveCliente = cfg.clave;
   }
   return cliente;
@@ -607,16 +618,37 @@ const esErrorDeParametro = err => {
  * Llama a Claude en streaming. Devuelve el texto completo.
  * onDelta(textoAcumulado) se dispara con cada fragmento.
  */
-async function pedir({ system, messages, maxTokens=1500, esfuerzo=null, onDelta=null, signal=null, modelo=null }){
+/* Vigilante de inactividad: si el stream deja de mandar texto durante `mudo`
+   milisegundos, se aborta. Sin esto una petición trabada se queda tomando un
+   carril de la cola de traducción y la pantalla parece congelada. */
+function conVigilante(signal, mudo){
+  const ctrl = new AbortController();
+  const estado = { colgado: false, señal: ctrl.signal };
+  if (signal){
+    if (signal.aborted) ctrl.abort();
+    else signal.addEventListener('abort', () => ctrl.abort(), { once:true });
+  }
+  let ultimo = Date.now();
+  const reloj = setInterval(() => {
+    if (Date.now() - ultimo > mudo){ estado.colgado = true; ctrl.abort(); }
+  }, 2000);
+  estado.latido = () => { ultimo = Date.now(); };
+  estado.parar  = () => clearInterval(reloj);
+  return estado;
+}
+
+async function pedir({ system, messages, maxTokens=1500, esfuerzo=null, onDelta=null, signal=null, modelo=null, mudo=25000 }){
   const cli = await getCliente();
   const m = modelo || cfg.modelo;
   for (let nivel = nivelParams; nivel <= 2; nivel++){
     let acumulado = '';
+    const v = conVigilante(signal, mudo);
     try {
       const params = { model: m, max_tokens: maxTokens, messages, ...extras(nivel, esfuerzo, m) };
       if (system) params.system = system;
-      const stream = cli.beta.messages.stream(params, signal ? { signal } : undefined);
+      const stream = cli.beta.messages.stream(params, { signal: v.señal });
       for await (const ev of stream){
+        v.latido();
         if (ev.type === 'content_block_delta' && ev.delta.type === 'text_delta'){
           acumulado += ev.delta.text;
           if (onDelta) onDelta(acumulado);
@@ -629,9 +661,12 @@ async function pedir({ system, messages, maxTokens=1500, esfuerzo=null, onDelta=
       nivelParams = nivel;
       return acumulado;
     } catch(err){
+      if (v.colgado) throw new Error('La respuesta se quedó trabada y la corté. Volvé a intentar.');
       if (signal && signal.aborted) throw err;
       if (nivel < 2 && !acumulado && esErrorDeParametro(err)){ continue; }   // degradamos y reintentamos
       throw traducirError(err);
+    } finally {
+      v.parar();
     }
   }
 }
@@ -681,9 +716,9 @@ Reglas:
 - Hasta 180 palabras en la respuesta principal. Frases cortas, para leer de reojo.
 - Si la pregunta pide varias cosas (por ejemplo "tus fortalezas"), desarrollá TODAS, cada una con su evidencia propia. Nunca contestes con una sola cuando piden tres.
 
-Después de la respuesta principal, agregá SIEMPRE un bloque de alternativas cuando la pregunta admita más de una historia o más de un ángulo, que es casi siempre. Ahí listás 2 o 3 opciones distintas sacadas del perfil, cada una con su dato duro y con la pista de cuándo conviene usarla. Es lo que le permite elegir en el momento según hacia dónde vaya la conversación. No repitas la historia que ya usaste arriba.
+FORMATO DE SALIDA — respetalo al pie de la letra, la pantalla lo parsea.
 
-Formato exacto de tu salida, sin encabezados extra:
+Primero la respuesta principal, sin ningún encabezado antes:
 **Opener:** <una frase para arrancar>
 - <punto clave 1, con dato>
 - <punto clave 2, con dato>
@@ -692,10 +727,13 @@ Formato exacto de tu salida, sin encabezados extra:
 **Close:** <una frase para cerrar>
 _ES: <una línea en español con la idea central, para que la chequee de un vistazo>_
 
-**Otras opciones:**
-- **<nombre corto de la historia o del ángulo>** — <el dato duro en una línea> · <cuándo usarla>
-- **<otra>** — <dato> · <cuándo usarla>
-- **<otra>** — <dato> · <cuándo usarla>`;
+Después, cuando la pregunta admita más de una historia o más de un ángulo —que es casi siempre— agregá 2 o 3 alternativas COMPLETAMENTE DESARROLLADAS. Cada una arranca con "### " al principio de una línea, y en ese mismo renglón va el título:
+### <nombre corto de la historia> · <en qué caso conviene esta y no otra>
+y debajo, la respuesta entera en inglés con exactamente el mismo formato que la principal: Opener, viñetas con datos, Close y la línea _ES:_.
+
+Cada alternativa tiene que estar lista para decirse tal cual, en voz alta, sin que el usuario tenga que completarla ni reescribirla. No es un resumen ni una nota: es otra respuesta posible a la misma pregunta. La elige de un vistazo por el título y la lee.
+No repitas en las alternativas la historia que ya usaste en la respuesta principal.
+Si la pregunta de verdad admite una sola respuesta (un dato puntual, un sí o un no), no inventes alternativas: devolvé solo la principal.`;
 
   const perf = bloquePerfil();
   if (!perf) return instrucciones + '\n\n(El usuario todavía no cargó su perfil: respondé de forma genérica y sugerile completarlo.)';
@@ -709,6 +747,7 @@ _ES: <una línea en español con la idea central, para que la chequee de un vist
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, escuchando = false, arrancando = false, wakeLock = null;
 let buffer = '', bufferTimer = null;
+let ultimoAudio = 0, vigilanteVoz = null;
 
 const RE_PREGUNTA = /(^|\s)(what|how|why|when|where|who|which|whose|can you|could you|would you|will you|do you|did you|does|have you|has|are you|is there|is it|tell me|walk me|describe|explain|give me|talk about|share|any experience|what's|how's|why's)\b/i;
 const esPregunta = t => /\?\s*$/.test(t.trim()) || RE_PREGUNTA.test(t.trim().slice(0, 60));
@@ -727,6 +766,7 @@ function iniciarEscucha(){
   rec.onstart = () => { arrancando = false; pintarEstado('on', 'Escuchando'); };
 
   rec.onresult = e => {
+    ultimoAudio = Date.now();
     let interina = '';
     for (let i = e.resultIndex; i < e.results.length; i++){
       const r = e.results[i];
@@ -759,8 +799,22 @@ function iniciarEscucha(){
   escuchando = true;
   $('#btnEscuchar').textContent = '■ Detener';
   $('#btnEscuchar').classList.remove('rec');
+  ultimoAudio = Date.now();
   arrancarRec();
   pedirWakeLock();
+
+  /* Chrome a veces deja de entregar resultados sin avisar ni cerrar la sesión:
+     no salta onend ni onerror, simplemente enmudece. Si pasan 20 segundos sin
+     nada, lo reiniciamos por las nuestras. */
+  clearInterval(vigilanteVoz);
+  vigilanteVoz = setInterval(() => {
+    if (!escuchando) return;
+    if (Date.now() - ultimoAudio > 20000){
+      ultimoAudio = Date.now();
+      pintarEstado('wait', 'Reiniciando la escucha…');
+      try { rec && rec.stop(); } catch(e){}   // onend vuelve a arrancarlo
+    }
+  }, 5000);
 }
 
 function arrancarRec(){
@@ -772,6 +826,7 @@ function arrancarRec(){
 
 function detenerEscucha(){
   escuchando = false;
+  clearInterval(vigilanteVoz); vigilanteVoz = null;
   vaciarBuffer();
   try { rec && rec.stop(); } catch(e){}
   rec = null;
@@ -900,6 +955,7 @@ Mantené el registro y el tono. Si la frase viene cortada, traducí igual lo que
     modelo: cfg.modeloTraduccion || cfg.modelo,
     maxTokens: 700,
     esfuerzo: 'low',
+    mudo: 15000,
     messages: [{ role:'user', content:
       (previas ? '<contexto_previo>\n' + previas + '\n</contexto_previo>\n\n' : '') +
       '<frase>\n' + l.en + '\n</frase>' }],
@@ -930,7 +986,8 @@ async function responder(pregunta){
   cont.innerHTML =
     '<div class="pregunta-eco"><b>Pregunta:</b> ' + esc(pregunta) + '</div>' +
     '<div class="tarjeta"><h4>Qué contestar <span class="cargando"><i></i><i></i><i></i></span></h4>' +
-    '<div class="rta" id="cuerpoRta"></div></div>';
+    '<div class="rta" id="cuerpoRta"></div></div>' +
+    '<div id="opcionesRta"></div>';
   $('#cuerpoApoyo').scrollTop = 0;
   $('#btnAmpliar').style.display = 'none';
 
@@ -941,11 +998,12 @@ async function responder(pregunta){
 
   try {
     const txt = await pedir({
-      system: systemRespuesta(), messages: mensajes, maxTokens: 2200, esfuerzo: 'low',
+      system: systemRespuesta(), messages: mensajes, maxTokens: 4000, esfuerzo: 'low',
       signal: ctrlRta.signal,
-      onDelta: t => { $('#cuerpoRta').innerHTML = md(t); }
+      mudo: 40000,
+      onDelta: t => pintarRespuesta(t)
     });
-    $('#cuerpoRta').innerHTML = md(txt);
+    pintarRespuesta(txt);
     $('.tarjeta .cargando') && $('.tarjeta .cargando').remove();
     histRta = mensajes.concat([{ role:'assistant', content: txt }]);
     $('#btnAmpliar').style.display = '';
@@ -954,6 +1012,39 @@ async function responder(pregunta){
     $('#cuerpoRta').innerHTML = '<p style="color:#ff9d96">' + esc(e.message) + '</p>';
     const c = document.querySelector('.tarjeta .cargando'); if (c) c.remove();
   }
+}
+
+/* La respuesta principal va en la tarjeta de arriba; cada alternativa que
+   manda el modelo se convierte en una opción desplegable, lista para leer en
+   voz alta. Conserva cuáles estaban abiertas mientras el texto sigue llegando. */
+function pintarRespuesta(txt){
+  const partes = String(txt || '').split(/\n(?=###\s)/);
+  $('#cuerpoRta').innerHTML = md(partes[0]);
+
+  const cont = $('#opcionesRta');
+  if (!cont) return;
+  const opciones = partes.slice(1);
+  if (!opciones.length){ cont.innerHTML = ''; return; }
+
+  const abiertas = new Set([...cont.querySelectorAll('details')].map((d, i) => d.open ? i : -1));
+  cont.innerHTML =
+    '<h4 class="tit-opciones">Otras respuestas para esta misma pregunta ' +
+    '<span>tocá una para desplegarla · teclas 1 a ' + Math.min(opciones.length, 9) + '</span></h4>' +
+    opciones.map((o, i) => {
+      const lineas = o.split('\n');
+      const tit = lineas[0].replace(/^###\s*/, '');
+      return '<details class="sec"' + (abiertas.has(i) ? ' open' : '') + '>' +
+        '<summary><span class="num">' + (i+1) + '</span>' + esc(tit) + '</summary>' +
+        '<div class="sec-cont rta">' + md(lineas.slice(1).join('\n')) + '</div></details>';
+    }).join('');
+}
+
+/* Abre o cierra la enésima alternativa y la trae a la vista. */
+function alternarOpcion(n){
+  const d = $$('#opcionesRta details')[n];
+  if (!d) return;
+  d.open = !d.open;
+  if (d.open) d.scrollIntoView({ block:'nearest', behavior:'smooth' });
 }
 
 async function ampliar(){
@@ -1311,6 +1402,7 @@ document.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (k === 'e'){ e.preventDefault(); $('#btnEscuchar').click(); }
   else if (k === 'r'){ e.preventDefault(); responder(''); }
+  else if (k >= '1' && k <= '9'){ e.preventDefault(); alternarOpcion(+k - 1); }
   else if (k === '+' || k === '='){ $('#btnMas').click(); }
   else if (k === '-'){ $('#btnMenos').click(); }
   else if (k === 'escape'){ cerrarVistas(); }
