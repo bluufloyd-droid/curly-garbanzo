@@ -545,7 +545,7 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
    Todo corre en el navegador. Los datos quedan en localStorage.
    ========================================================================= */
 
-const VERSION = 'v11';   // subir junto con CACHE en sw.js al publicar cambios
+const VERSION = 'v12';   // subir junto con CACHE en sw.js al publicar cambios
 const SDK_URL = './vendor/anthropic.mjs';   // SDK oficial de Anthropic, copia local (ver vendor/LEEME.md)
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -830,15 +830,20 @@ let dgFinales = '', dgEsAcum = '', dgCola = Promise.resolve();
 const PCM_WORKLET = `
 class PCM extends AudioWorkletProcessor {
   process(entradas){
-    const canal = entradas[0] && entradas[0][0];
-    if (canal){
-      const pcm = new Int16Array(canal.length);
-      for (let i = 0; i < canal.length; i++){
-        const m = Math.max(-1, Math.min(1, canal[i]));
-        pcm[i] = m < 0 ? m * 0x8000 : m * 0x7FFF;
-      }
-      this.port.postMessage(pcm.buffer, [pcm.buffer]);
+    const canales = entradas[0];
+    if (!canales || !canales.length || !canales[0]) return true;
+    /* Se mezclan TODOS los canales a mono. En un dispositivo agregado —el que
+       junta BlackHole con el micrófono para ensayar— cada fuente cae en un
+       canal distinto: quedarse con el primero perdería una de las dos voces. */
+    const largo = canales[0].length;
+    const pcm = new Int16Array(largo);
+    for (let i = 0; i < largo; i++){
+      let suma = 0;
+      for (let c = 0; c < canales.length; c++) suma += canales[c][i] || 0;
+      const m = Math.max(-1, Math.min(1, suma / canales.length));
+      pcm[i] = m < 0 ? m * 0x8000 : m * 0x7FFF;
     }
+    this.port.postMessage(pcm.buffer, [pcm.buffer]);
     return true;
   }
 }
