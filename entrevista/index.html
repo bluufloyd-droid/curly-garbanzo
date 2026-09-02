@@ -517,7 +517,7 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
    Todo corre en el navegador. Los datos quedan en localStorage.
    ========================================================================= */
 
-const VERSION = 'v8';   // subir junto con CACHE en sw.js al publicar cambios
+const VERSION = 'v9';   // subir junto con CACHE en sw.js al publicar cambios
 const SDK_URL = './vendor/anthropic.mjs';   // SDK oficial de Anthropic, copia local (ver vendor/LEEME.md)
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -916,10 +916,15 @@ let autoTimer = null;
 
 function agregarLinea(texto){
   const l = { id: 'l'+Date.now()+Math.random().toString(36).slice(2,6), ts: Date.now(), en: texto, es: '', preg: esPregunta(texto) };
+  /* Lo que el usuario ya leyó mientras se hablaba se conserva tal cual: la
+     línea definitiva arranca con eso y solo se le agrega lo que falte. */
+  if (antEsFijado && texto.startsWith(antEnFijado.trim().slice(0, 40))){
+    l.esFijado = antEsFijado; l.enFijado = antEnFijado.trim();
+  }
+  reiniciarAnticipada();
   lineas.push(l);
   if (lineas.length > 400) lineas.splice(0, lineas.length - 400);
   pintarLinea(l);
-  ultimaProvisional = '';
   guardarLineas();
   if (l.preg) ultimaPregunta = l;
   if (cfg.traducir && cfg.clave) encolar(l);
@@ -943,7 +948,7 @@ function pintarLinea(l){
   div.innerHTML =
     '<p class="en">' + esc(l.en) + '</p>' +
     '<p class="es ' + (l.es ? '' : 'pend') + '" data-es>' +
-      (l.es ? esc(l.es) : (cfg.traducir && cfg.clave ? esc(ultimaProvisional || 'traduciendo…') : '')) + '</p>' +
+      (l.es ? esc(l.es) : (cfg.traducir && cfg.clave ? esc(l.esFijado || 'traduciendo…') : '')) + '</p>' +
     '<div class="meta"><span class="hora">' + hora(l.ts) + '</span>' +
       (l.preg ? '<span class="chip">pregunta</span><button class="btn mini" data-responder="'+l.id+'">Responder esto</button>' : '') +
     '</div>';
@@ -956,7 +961,7 @@ function pintarInterina(txt){
   let el = $('#interina');
   if (!txt){
     if (el) el.remove();
-    antTexto = ''; antEnviado = ''; clearTimeout(antTimer);
+    reiniciarAnticipada();
     return;
   }
   if (!el){
@@ -983,45 +988,80 @@ function autoScroll(cont){
 }
 
 /* ===================== TRADUCCIÓN ANTICIPADA ==========================
-   Traduce la frase mientras todavía se está diciendo, y la va corrigiendo a
-   medida que crece. Es lo que hace que se sienta simultáneo: el usuario no
-   espera a que el interlocutor cierre la idea.
-   Cada nueva versión cancela la anterior, y un número de secuencia descarta
-   las respuestas que llegan tarde y ya no corresponden a lo que se está
-   diciendo. Lo último traducido queda como texto de arranque de la línea
-   definitiva, para que la pantalla no parpadee en blanco. */
-let ctrlAnt = null, seqAnt = 0, antTimer = null;
-let antTexto = '', antEnviado = '', ultimaProvisional = '';
+   Traduce la frase mientras todavía se está diciendo, POR TRAMOS y sin volver
+   a escribir lo ya traducido. Retraducir la frase entera cada vez que crecía
+   hacía que el texto se reescribiera bajo la vista del lector, que es peor que
+   el retraso: no se puede leer algo que cambia mientras lo leés.
 
-function programarAnticipada(txt){
-  const t = (txt || '').trim();
-  if (t.length < 15 || t === antTexto) return;
-  antTexto = t;
-  /* No vale la pena retraducir por dos palabras nuevas. */
-  if (antEnviado && t.length - antEnviado.length < 12 && t.startsWith(antEnviado)) return;
+   El corte se hace en la puntuación, que es donde el habla también corta. Cada
+   tramo se traduce una sola vez, se agrega al final de lo que ya hay, y no se
+   toca nunca más. Lo que se acumuló pasa después a la línea definitiva, así que
+   tampoco hay reescritura al cerrarse la frase. */
+let antTimer = null, antOcupado = false;
+let antEnFijado = '', antEsFijado = '';
+
+function reiniciarAnticipada(){
   clearTimeout(antTimer);
-  antTimer = setTimeout(() => traducirAnticipada(t), 500);
+  antEnFijado = ''; antEsFijado = '';
 }
 
-async function traducirAnticipada(t){
-  if (ctrlAnt) ctrlAnt.abort();
-  ctrlAnt = new AbortController();
-  const mio = ++seqAnt;
-  antEnviado = t;
+function programarAnticipada(txt){
+  clearTimeout(antTimer);
+  antTimer = setTimeout(() => avanzarAnticipada(txt), 350);
+}
+
+/* Devuelve el próximo tramo cerrado que valga la pena traducir, o '' si todavía
+   no hay ninguno. Corta en puntuación; si el hablante lleva mucho sin puntuar,
+   corta igual para no dejar al lector esperando. */
+function proximoTramo(resto){
+  const m = resto.match(/^[\s\S]*?[,.;:!?…]+/);
+  if (m && m[0].trim().length >= 10) return m[0];
+  if (resto.trim().length > 85) return resto;
+  return '';
+}
+
+async function avanzarAnticipada(txt){
+  if (antOcupado) return;
+  const t = txt || '';
+  if (!t.trim()) return;
+
+  /* El reconocedor a veces corrige palabras que ya dimos por fijas. Si eso
+     pasa, lo fijado dejó de ser válido y hay que empezar de nuevo. Es raro y
+     la traducción definitiva lo termina de arreglar. */
+  if (antEnFijado && !t.startsWith(antEnFijado)) reiniciarAnticipada();
+
+  const resto = t.slice(antEnFijado.length);
+  const tramo = proximoTramo(resto);
+  if (!tramo) return;
+
+  const corte = antEnFijado.length + tramo.length;
+  const contexto = antEnFijado.slice(-160).trim();
   const idioma = NOMBRE_IDIOMA[(cfg.idiomaOrigen||'en').slice(0,2)] || 'inglés';
+
+  antOcupado = true;
   try {
-    const txt = await pedir({
+    const es = await pedir({
       system:
 `Sos intérprete simultáneo en una entrevista de trabajo. Traducís del ${idioma} al español neutro rioplatense.
-La frase que te llega TODAVÍA SE ESTÁ DICIENDO y está incompleta. Traducí solamente lo que hay, sin completarla,
-sin adivinar cómo termina y sin agregar puntuación final. Devolvés únicamente la traducción, nada más.` + glosario(t),
+Te llega un TRAMO de una frase que todavía se está diciendo, junto con lo que se dijo antes.
+Traducí ÚNICAMENTE el tramo nuevo. El contexto previo es para que entiendas de qué se habla: no lo traduzcas ni lo repitas.
+No completes la idea, no adivines cómo sigue y no agregues puntuación final que no esté.
+Devolvés solamente la traducción del tramo, nada más.` + glosario(tramo),
       modelo: cfg.modeloTraduccion || cfg.modelo,
-      messages: [{ role:'user', content: t }],
-      maxTokens: 400, esfuerzo: 'low', mudo: 10000, signal: ctrlAnt.signal,
-      onDelta: p => { if (mio === seqAnt) mostrarProvisional(p); }
+      messages: [{ role:'user', content:
+        (contexto ? '<ya_dicho>\n' + contexto + '\n</ya_dicho>\n\n' : '') +
+        '<tramo_nuevo>\n' + tramo.trim() + '\n</tramo_nuevo>' }],
+      maxTokens: 400, esfuerzo: 'low', mudo: 12000,
+      onDelta: p => mostrarProvisional((antEsFijado + ' ' + p).trim())
     });
-    if (mio === seqAnt){ ultimaProvisional = txt.trim(); mostrarProvisional(ultimaProvisional); }
-  } catch(e){ /* es provisional: si falla, la traducción definitiva lo resuelve */ }
+    antEsFijado = (antEsFijado + ' ' + es.trim()).trim();
+    antEnFijado = t.slice(0, corte);
+    mostrarProvisional(antEsFijado);
+  } catch(e){
+    /* provisional: si falla, el tramo se vuelve a intentar o lo cubre la definitiva */
+  } finally {
+    antOcupado = false;
+  }
 }
 
 /* ============================== TRADUCCIÓN ============================= */
@@ -1042,6 +1082,38 @@ function bombear(){
 
 async function traducir(l){
   const t0 = Date.now();
+
+  /* Si la anticipada ya tradujo casi toda la frase, no se retraduce: se completa.
+     Retraducir sería reescribir en pantalla algo que el usuario ya leyó. */
+  if (l.esFijado && l.enFijado && l.en.startsWith(l.enFijado)){
+    const cola = l.en.slice(l.enFijado.length).trim();
+    const el0 = document.querySelector('#'+l.id+' [data-es]');
+    if (cola.length < 4){
+      l.es = l.esFijado;
+      if (el0){ el0.textContent = l.es; el0.classList.remove('pend'); }
+      sellarTiempo(l, t0);
+      guardarLineas();
+      return;
+    }
+    const idioma0 = NOMBRE_IDIOMA[(cfg.idiomaOrigen||'en').slice(0,2)] || 'inglés';
+    const resto = await pedir({
+      system:
+`Sos intérprete simultáneo. Traducís del ${idioma0} al español neutro rioplatense.
+Te llega el final de una frase junto con lo que ya se dijo. Traducí ÚNICAMENTE el tramo final; el contexto es para entender, no para traducirlo ni repetirlo.
+Devolvés solamente esa traducción.` + glosario(cola),
+      modelo: cfg.modeloTraduccion || cfg.modelo,
+      maxTokens: 500, esfuerzo: 'low', mudo: 15000,
+      messages: [{ role:'user', content:
+        '<ya_dicho>\n' + l.enFijado.slice(-200) + '\n</ya_dicho>\n\n<tramo_final>\n' + cola + '\n</tramo_final>' }],
+      onDelta: t => { if (el0){ el0.textContent = (l.esFijado + ' ' + t).trim(); el0.classList.remove('pend'); } }
+    });
+    l.es = (l.esFijado + ' ' + resto.trim()).trim();
+    if (el0){ el0.textContent = l.es; el0.classList.remove('pend'); }
+    sellarTiempo(l, t0);
+    guardarLineas();
+    return;
+  }
+
   const idioma = NOMBRE_IDIOMA[(cfg.idiomaOrigen||'en').slice(0,2)] || 'inglés';
   const system =
 `Sos intérprete simultáneo en una entrevista de trabajo. Traducís del ${idioma} al español neutro rioplatense.
@@ -1066,6 +1138,11 @@ Mantené el registro y el tono. Si la frase viene cortada, traducí igual lo que
   });
   l.es = txt.trim();
   if (el){ el.textContent = l.es; el.classList.remove('pend'); }
+  sellarTiempo(l, t0);
+  guardarLineas();
+}
+
+function sellarTiempo(l, t0){
   const meta = document.querySelector('#'+l.id+' .meta');
   if (meta && !meta.querySelector('.ms')){
     const m = document.createElement('span');
@@ -1073,7 +1150,6 @@ Mantené el registro y el tono. Si la frase viene cortada, traducí igual lo que
     m.textContent = ((Date.now()-t0)/1000).toFixed(1) + ' s';
     meta.appendChild(m);
   }
-  guardarLineas();
 }
 
 /* ============================ RESPUESTA EN VIVO ======================== */
