@@ -98,7 +98,11 @@ main.solo-vivo .col-apoyo, main.solo-apoyo .col-vivo{display:none}
   font-size:.7em; text-transform:uppercase; letter-spacing:.06em; font-weight:700;
   background:rgba(76,141,255,.16); color:var(--acc2); padding:2px 7px; border-radius:20px;
 }
-.interina{padding:10px 0; color:var(--txt3); font-size:1.05em; font-style:italic; opacity:.75}
+.interina{padding:10px 0 12px; opacity:.8}
+.interina .en{color:var(--txt3); font-size:.92em; line-height:1.45; margin:0 0 3px; font-style:italic}
+.interina .es{color:var(--txt2); font-size:1.16em; line-height:1.5; margin:0; font-style:italic}
+.interina .es:empty{display:none}
+.solo-es .interina .en{display:none}
 .solo-es .linea .en{display:none}
 .vacio{color:var(--txt3); text-align:center; padding:48px 20px; line-height:1.7; font-size:.95em}
 .vacio h3{color:var(--txt2); font-size:1.05em; margin:0 0 10px; font-weight:600}
@@ -442,6 +446,9 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
     <label class="check"><input type="checkbox" id="cfTraducir" checked>
       <span><b>Traducir en simultáneo</b><i>Cada frase se traduce apenas se cierra. Desactivalo si solo querés la transcripción.</i></span></label>
 
+    <label class="check"><input type="checkbox" id="cfAnticipada" checked>
+      <span><b>Traducción anticipada</b><i>Traduce mientras la persona todavía habla, y va corrigiendo a medida que la frase avanza. Es lo que hace que se sienta simultáneo. Multiplica por tres o cuatro las llamadas de traducción: una entrevista pasa de unos USD 2 a unos USD 5.</i></span></label>
+
     <label class="check"><input type="checkbox" id="cfAutoResponder">
       <span><b>Responder solo cuando detecto una pregunta</b><i>Arma la respuesta sin que pulses nada. Cómodo, pero gasta más y a veces se dispara de más.</i></span></label>
 
@@ -456,7 +463,11 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
 
     <h2 style="font-size:1.15em;margin:34px 0 6px">De dónde sale el audio</h2>
     <p class="sub" style="margin-bottom:14px">
-      La transcripción escucha el <b>micrófono que tenga seleccionado tu Mac</b>. De eso depende todo lo demás.
+      La transcripción escucha el micrófono que tenga seleccionado <b>Chrome</b>, que no siempre es el del
+      sistema: Chrome guarda su propia elección por sitio. Si cambiás la entrada del Mac y acá no cambia nada,
+      entrá a <code>chrome://settings/content/microphone</code> y elegí el mismo dispositivo, o tocá el ícono
+      a la izquierda de la barra de direcciones → Micrófono. Después <b>detené y reiniciá la escucha</b>: el
+      reconocimiento se queda pegado al micrófono que tomó al arrancar.
     </p>
 
     <div class="nota aviso">
@@ -506,7 +517,7 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
    Todo corre en el navegador. Los datos quedan en localStorage.
    ========================================================================= */
 
-const VERSION = 'v7';   // subir junto con CACHE en sw.js al publicar cambios
+const VERSION = 'v8';   // subir junto con CACHE en sw.js al publicar cambios
 const SDK_URL = './vendor/anthropic.mjs';   // SDK oficial de Anthropic, copia local (ver vendor/LEEME.md)
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -521,7 +532,7 @@ const store = {
 
 const CFG_DEF = {
   clave:'', modelo:'claude-opus-5', modeloTraduccion:'claude-haiku-4-5', idiomaOrigen:'en-US',
-  traducir:true, autoResponder:false, rapido:false,
+  traducir:true, anticipada:true, autoResponder:false, rapido:false,
   fs:1, soloEs:false, vista:0, notas:''
 };
 const PERFIL_DEF = { nombre:'', puesto:'', empresa:'', cv:'', logros:'', proyecto:'', jd:'', glosario:'' };
@@ -908,6 +919,7 @@ function agregarLinea(texto){
   lineas.push(l);
   if (lineas.length > 400) lineas.splice(0, lineas.length - 400);
   pintarLinea(l);
+  ultimaProvisional = '';
   guardarLineas();
   if (l.preg) ultimaPregunta = l;
   if (cfg.traducir && cfg.clave) encolar(l);
@@ -930,7 +942,8 @@ function pintarLinea(l){
   div.id = l.id;
   div.innerHTML =
     '<p class="en">' + esc(l.en) + '</p>' +
-    '<p class="es ' + (l.es ? '' : 'pend') + '" data-es>' + (l.es ? esc(l.es) : (cfg.traducir && cfg.clave ? 'traduciendo…' : '')) + '</p>' +
+    '<p class="es ' + (l.es ? '' : 'pend') + '" data-es>' +
+      (l.es ? esc(l.es) : (cfg.traducir && cfg.clave ? esc(ultimaProvisional || 'traduciendo…') : '')) + '</p>' +
     '<div class="meta"><span class="hora">' + hora(l.ts) + '</span>' +
       (l.preg ? '<span class="chip">pregunta</span><button class="btn mini" data-responder="'+l.id+'">Responder esto</button>' : '') +
     '</div>';
@@ -941,13 +954,25 @@ function pintarLinea(l){
 
 function pintarInterina(txt){
   let el = $('#interina');
-  if (!txt){ if (el) el.remove(); return; }
+  if (!txt){
+    if (el) el.remove();
+    antTexto = ''; antEnviado = ''; clearTimeout(antTimer);
+    return;
+  }
   if (!el){
     el = document.createElement('div');
     el.id = 'interina'; el.className = 'interina';
+    el.innerHTML = '<p class="en" data-ien></p><p class="es" data-ies></p>';
     $('#cuerpoVivo').appendChild(el);
   }
-  el.textContent = txt;
+  el.querySelector('[data-ien]').textContent = txt;
+  autoScroll($('#cuerpoVivo'));
+  if (cfg.anticipada && cfg.traducir && cfg.clave) programarAnticipada(txt);
+}
+
+function mostrarProvisional(txt){
+  const el = document.querySelector('#interina [data-ies]');
+  if (el) el.textContent = txt;
   autoScroll($('#cuerpoVivo'));
 }
 
@@ -955,6 +980,48 @@ function pintarInterina(txt){
 function autoScroll(cont){
   const cerca = cont.scrollHeight - cont.scrollTop - cont.clientHeight < 260;
   if (cerca) cont.scrollTop = cont.scrollHeight;
+}
+
+/* ===================== TRADUCCIÓN ANTICIPADA ==========================
+   Traduce la frase mientras todavía se está diciendo, y la va corrigiendo a
+   medida que crece. Es lo que hace que se sienta simultáneo: el usuario no
+   espera a que el interlocutor cierre la idea.
+   Cada nueva versión cancela la anterior, y un número de secuencia descarta
+   las respuestas que llegan tarde y ya no corresponden a lo que se está
+   diciendo. Lo último traducido queda como texto de arranque de la línea
+   definitiva, para que la pantalla no parpadee en blanco. */
+let ctrlAnt = null, seqAnt = 0, antTimer = null;
+let antTexto = '', antEnviado = '', ultimaProvisional = '';
+
+function programarAnticipada(txt){
+  const t = (txt || '').trim();
+  if (t.length < 15 || t === antTexto) return;
+  antTexto = t;
+  /* No vale la pena retraducir por dos palabras nuevas. */
+  if (antEnviado && t.length - antEnviado.length < 12 && t.startsWith(antEnviado)) return;
+  clearTimeout(antTimer);
+  antTimer = setTimeout(() => traducirAnticipada(t), 500);
+}
+
+async function traducirAnticipada(t){
+  if (ctrlAnt) ctrlAnt.abort();
+  ctrlAnt = new AbortController();
+  const mio = ++seqAnt;
+  antEnviado = t;
+  const idioma = NOMBRE_IDIOMA[(cfg.idiomaOrigen||'en').slice(0,2)] || 'inglés';
+  try {
+    const txt = await pedir({
+      system:
+`Sos intérprete simultáneo en una entrevista de trabajo. Traducís del ${idioma} al español neutro rioplatense.
+La frase que te llega TODAVÍA SE ESTÁ DICIENDO y está incompleta. Traducí solamente lo que hay, sin completarla,
+sin adivinar cómo termina y sin agregar puntuación final. Devolvés únicamente la traducción, nada más.` + glosario(t),
+      modelo: cfg.modeloTraduccion || cfg.modelo,
+      messages: [{ role:'user', content: t }],
+      maxTokens: 400, esfuerzo: 'low', mudo: 10000, signal: ctrlAnt.signal,
+      onDelta: p => { if (mio === seqAnt) mostrarProvisional(p); }
+    });
+    if (mio === seqAnt){ ultimaProvisional = txt.trim(); mostrarProvisional(ultimaProvisional); }
+  } catch(e){ /* es provisional: si falla, la traducción definitiva lo resuelve */ }
 }
 
 /* ============================== TRADUCCIÓN ============================= */
@@ -1335,6 +1402,7 @@ function cargarAjustesEnFormulario(){
   $('#cfModeloTraduccion').value = cfg.modeloTraduccion;
   $('#cfIdiomaOrigen').value = cfg.idiomaOrigen;
   $('#cfTraducir').checked   = cfg.traducir;
+  $('#cfAnticipada').checked = cfg.anticipada;
   $('#cfAutoResponder').checked = cfg.autoResponder;
   $('#cfRapido').checked     = cfg.rapido;
 }
@@ -1344,6 +1412,7 @@ function guardarAjustes(){
   cfg.modeloTraduccion = $('#cfModeloTraduccion').value;
   cfg.idiomaOrigen = $('#cfIdiomaOrigen').value;
   cfg.traducir     = $('#cfTraducir').checked;
+  cfg.anticipada   = $('#cfAnticipada').checked;
   cfg.autoResponder= $('#cfAutoResponder').checked;
   cfg.rapido       = $('#cfRapido').checked;
   store.set('cfg', cfg);
