@@ -411,6 +411,14 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
         </select>
       </div>
       <div class="campo">
+        <label>Modelo para traducir</label>
+        <select id="cfModeloTraduccion">
+          <option value="claude-haiku-4-5">Haiku 4.5 — el más rápido (recomendado)</option>
+          <option value="claude-sonnet-5">Sonnet 5 — intermedio</option>
+          <option value="">El mismo de las respuestas</option>
+        </select>
+      </div>
+      <div class="campo">
         <label>Idioma del entrevistador</label>
         <select id="cfIdiomaOrigen">
           <option value="en-US">Inglés (EE.UU.)</option>
@@ -496,7 +504,7 @@ const store = {
 };
 
 const CFG_DEF = {
-  clave:'', modelo:'claude-opus-5', idiomaOrigen:'en-US',
+  clave:'', modelo:'claude-opus-5', modeloTraduccion:'claude-haiku-4-5', idiomaOrigen:'en-US',
   traducir:true, autoResponder:false, rapido:false,
   fs:1, soloEs:false, vista:0, notas:''
 };
@@ -579,8 +587,8 @@ async function getCliente(){
   return cliente;
 }
 
-function extras(nivel, esfuerzo){
-  const m = cfg.modelo, e = {}, betas = [];
+function extras(nivel, esfuerzo, m){
+  const e = {}, betas = [];
   if (nivel <= 1 && esfuerzo && CON_ESFUERZO.has(m)) e.output_config = { effort: esfuerzo };
   if (nivel === 0){
     if (CON_FALLBACK.has(m)){ betas.push('server-side-fallback-2026-07-01'); e.fallbacks = 'default'; }
@@ -599,12 +607,13 @@ const esErrorDeParametro = err => {
  * Llama a Claude en streaming. Devuelve el texto completo.
  * onDelta(textoAcumulado) se dispara con cada fragmento.
  */
-async function pedir({ system, messages, maxTokens=1500, esfuerzo=null, onDelta=null, signal=null }){
+async function pedir({ system, messages, maxTokens=1500, esfuerzo=null, onDelta=null, signal=null, modelo=null }){
   const cli = await getCliente();
+  const m = modelo || cfg.modelo;
   for (let nivel = nivelParams; nivel <= 2; nivel++){
     let acumulado = '';
     try {
-      const params = { model: cfg.modelo, max_tokens: maxTokens, messages, ...extras(nivel, esfuerzo) };
+      const params = { model: m, max_tokens: maxTokens, messages, ...extras(nivel, esfuerzo, m) };
       if (system) params.system = system;
       const stream = cli.beta.messages.stream(params, signal ? { signal } : undefined);
       for await (const ev of stream){
@@ -667,17 +676,26 @@ Te paso lo que acaba de preguntar el entrevistador y tenés que darle, en segund
 Reglas:
 - La respuesta va EN INGLÉS, en primera persona, con el tono de alguien senior, cálido y concreto. Nada de jerga vacía.
 - Apoyate ÚNICAMENTE en los datos del perfil. Si algo no está, no lo inventes: preferí una formulación honesta y general antes que un dato falso.
-- Priorizá siempre un logro con número por sobre una declaración de intenciones.
-- Cuando la pregunta pida una experiencia, usá estructura STAR comprimida (situación, qué hiciste, resultado).
-- Máximo 120 palabras en inglés. Está pensado para leerse de reojo, no para recitarse.
+- Priorizá siempre un logro con número por sobre una declaración de intenciones. Cada viñeta tiene que traer un dato concreto: una cifra, un nombre de operación, un plazo o un tamaño de equipo. Una viñeta sin dato es una viñeta desperdiciada.
+- Cuando la pregunta pida una experiencia, usá estructura STAR comprimida (situación, qué hiciste, resultado con número).
+- Hasta 180 palabras en la respuesta principal. Frases cortas, para leer de reojo.
+- Si la pregunta pide varias cosas (por ejemplo "tus fortalezas"), desarrollá TODAS, cada una con su evidencia propia. Nunca contestes con una sola cuando piden tres.
+
+Después de la respuesta principal, agregá SIEMPRE un bloque de alternativas cuando la pregunta admita más de una historia o más de un ángulo, que es casi siempre. Ahí listás 2 o 3 opciones distintas sacadas del perfil, cada una con su dato duro y con la pista de cuándo conviene usarla. Es lo que le permite elegir en el momento según hacia dónde vaya la conversación. No repitas la historia que ya usaste arriba.
 
 Formato exacto de tu salida, sin encabezados extra:
 **Opener:** <una frase para arrancar>
-- <punto clave 1>
-- <punto clave 2>
-- <punto clave 3>
+- <punto clave 1, con dato>
+- <punto clave 2, con dato>
+- <punto clave 3, con dato>
+- <punto clave 4, solo si aporta algo nuevo>
 **Close:** <una frase para cerrar>
-_ES: <una línea en español con la idea central, para que la chequee de un vistazo>_`;
+_ES: <una línea en español con la idea central, para que la chequee de un vistazo>_
+
+**Otras opciones:**
+- **<nombre corto de la historia o del ángulo>** — <el dato duro en una línea> · <cuándo usarla>
+- **<otra>** — <dato> · <cuándo usarla>
+- **<otra>** — <dato> · <cuándo usarla>`;
 
   const perf = bloquePerfil();
   if (!perf) return instrucciones + '\n\n(El usuario todavía no cargó su perfil: respondé de forma genérica y sugerile completarlo.)';
@@ -879,6 +897,7 @@ Mantené el registro y el tono. Si la frase viene cortada, traducí igual lo que
   const el = document.querySelector('#'+l.id+' [data-es]');
   const txt = await pedir({
     system,
+    modelo: cfg.modeloTraduccion || cfg.modelo,
     maxTokens: 700,
     esfuerzo: 'low',
     messages: [{ role:'user', content:
@@ -922,7 +941,7 @@ async function responder(pregunta){
 
   try {
     const txt = await pedir({
-      system: systemRespuesta(), messages: mensajes, maxTokens: 1200, esfuerzo: 'low',
+      system: systemRespuesta(), messages: mensajes, maxTokens: 2200, esfuerzo: 'low',
       signal: ctrlRta.signal,
       onDelta: t => { $('#cuerpoRta').innerHTML = md(t); }
     });
@@ -1140,6 +1159,7 @@ async function importarCv(file){
 function cargarAjustesEnFormulario(){
   $('#cfClave').value        = cfg.clave;
   $('#cfModelo').value       = cfg.modelo;
+  $('#cfModeloTraduccion').value = cfg.modeloTraduccion;
   $('#cfIdiomaOrigen').value = cfg.idiomaOrigen;
   $('#cfTraducir').checked   = cfg.traducir;
   $('#cfAutoResponder').checked = cfg.autoResponder;
@@ -1148,6 +1168,7 @@ function cargarAjustesEnFormulario(){
 function guardarAjustes(){
   cfg.clave        = $('#cfClave').value.trim();
   cfg.modelo       = $('#cfModelo').value;
+  cfg.modeloTraduccion = $('#cfModeloTraduccion').value;
   cfg.idiomaOrigen = $('#cfIdiomaOrigen').value;
   cfg.traducir     = $('#cfTraducir').checked;
   cfg.autoResponder= $('#cfAutoResponder').checked;
