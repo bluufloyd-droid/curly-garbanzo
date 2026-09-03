@@ -1,6 +1,6 @@
 /* Service worker del generador de QR: deja la app instalada y funcionando sin
    conexión. Al publicar cambios hay que subir el número de CACHE. */
-var CACHE = "qr-v1";
+var CACHE = "qr-v2";
 var ARCHIVOS = [
   "./", "./index.html", "./qr.js", "./manifest.json", "./icono.svg"
 ];

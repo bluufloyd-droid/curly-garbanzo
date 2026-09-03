@@ -10,7 +10,7 @@ apenas se sube al repositorio. Esa dirección es la que va adentro del código Q
    Usá nombres sin espacios ni acentos (`contrato-alquiler.pdf`, no `Contrato Alquiler.pdf`):
    así la dirección queda corta y el QR más simple de leer.
 
-2. **Anotalo en `documentos.json`**, para que aparezca en la lista y en el generador:
+2. **Anotalo en `documentos.json`**, para que aparezca en el desplegable del generador:
 
    ```json
    {
@@ -46,8 +46,15 @@ verse: si querés que se lea de una, exportalo a PDF antes de subirlo.
 Subí el archivo nuevo **con el mismo nombre**: la dirección no cambia y el QR ya
 impreso sigue sirviendo. Por eso conviene elegir bien el nombre desde el principio.
 
-## Importante: esto es público
+## Importante: quién puede ver qué
 
-Cualquiera que tenga el enlace —o que escanee el QR— puede ver el documento, y los
-buscadores pueden llegar a indexarlo. No subas acá nada con datos personales
-sensibles, contraseñas ni información que no quieras que circule.
+Esta carpeta **no tiene página de índice**, a propósito: entrar a
+`…/curly-garbanzo/documentos/` da error, así que quien escanea un QR abre ese documento
+y no tiene por dónde ver los demás.
+
+Pero eso esconde la lista, **no vuelve privado a ningún archivo**. Cualquiera que tenga
+—o adivine— la dirección exacta lo abre, y los buscadores pueden llegar a indexarlo.
+Si el nombre es previsible (`contrato.pdf`, `cv.pdf`), agregale un tramo al azar:
+`contrato-9f3a71c4.pdf`. Y si el documento es realmente sensible, no lo subas acá:
+usá un servicio con enlaces protegidos y generá el QR de esa dirección con la pestaña
+«Cualquier enlace».
