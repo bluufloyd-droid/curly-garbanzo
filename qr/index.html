@@ -225,7 +225,7 @@
 
 <footer>
   Los documentos se publican desde la carpeta <code>documentos/</code> de este mismo repositorio.
-  <a id="link-carpeta" href="../documentos/">Ver la lista</a>.
+  El código lleva siempre a un archivo, nunca a la lista.
 </footer>
 
 </div>
@@ -253,8 +253,6 @@
   var modo = "doc";
   var actual = null;   // último QR generado
 
-  el("link-carpeta").href = base + "documentos/";
-
   function aviso(nodo, texto, clase){
     nodo.textContent = texto || "";
     nodo.className = "aviso" + (texto ? " " + clase : "");
@@ -268,7 +266,6 @@
   }
 
   function cargarDocumentos(){
-    selDoc.appendChild(opcion(base + "documentos/", "Todos los documentos (la lista completa)"));
     return fetch(base + "documentos/documentos.json", { cache: "no-cache" })
       .then(function(r){
         if(!r.ok) throw new Error("no se pudo leer documentos.json");

@@ -17,8 +17,10 @@ El circuito completo son dos piezas:
 1. **Subí el documento** a la carpeta [`documentos/`](../documentos/) del repositorio
    (en GitHub: *Add file → Upload files*, parado en esa carpeta) y anotalo en
    `documentos.json`. El paso a paso está en [`documentos/LEEME.md`](../documentos/LEEME.md).
-2. **Abrí la app** y elegí el documento de la lista. Abajo se ve la dirección exacta
+2. **Abrí la app** y elegí el documento en el desplegable. Abajo se ve la dirección exacta
    que va a abrir el QR; se puede tocar para comprobar que lleva a donde tiene que llevar.
+   Un código apunta siempre a **un archivo**: quien lo escanea abre ese documento y nada más,
+   no hay ninguna página que liste los demás.
 3. **Descargalo** en PNG (para pegar en un mail, un cartel o un documento) o en SVG
    (para imprimir a cualquier tamaño sin que se pixele), o mandalo directo a la impresora.
 
@@ -34,7 +36,7 @@ la pestaña **«Cualquier enlace»** genera el QR de esa dirección, sin subir n
   más grande. Media alcanza para una hoja pegada en la pared; Máxima conviene en una
   etiqueta que se va a manosear.
 - **Se instala como app** y **funciona sin conexión** (es una PWA, igual que el resto del
-  repositorio). Lo único que necesita red es la lista de documentos.
+  repositorio). Lo único que necesita red es el desplegable de documentos.
 - **Enlace directo**: `?doc=contrato.pdf` abre la app con ese documento ya elegido, y
   `?url=https://…` con esa dirección ya cargada.
 
@@ -45,12 +47,23 @@ mismo nombre**, la dirección no cambia y todos los códigos ya impresos siguen 
 quien escanee va a ver la versión nueva. Por eso conviene elegir bien el nombre del
 archivo desde el principio.
 
-## Tené en cuenta que es público
+## Quién puede ver qué
 
-GitHub Pages publica la carpeta para cualquiera que tenga el enlace, y los buscadores
-pueden llegar a indexarla. No subas documentos con datos personales sensibles,
-contraseñas ni nada que no quieras que circule. Para algo privado conviene un servicio
-con enlaces protegidos, y usar la pestaña «Cualquier enlace» con esa dirección.
+La carpeta `documentos/` **no tiene página de índice**: entrar a
+`…/curly-garbanzo/documentos/` da error, así que quien escanea un QR abre ese documento
+y no tiene por dónde ver los demás.
+
+Eso esconde la lista, pero **no vuelve privado a ningún archivo**: GitHub Pages sirve
+cualquier documento de esa carpeta a quien tenga —o adivine— su dirección exacta, y los
+buscadores pueden llegar a indexarlo. Dos consecuencias prácticas:
+
+- Un nombre de archivo previsible (`contrato.pdf`, `cv.pdf`) es fácil de adivinar. Si el
+  documento no debería circular, agregale al nombre un tramo al azar:
+  `contrato-9f3a71c4.pdf`. La dirección deja de ser adivinable y el QR sigue igual de
+  simple de escanear.
+- Si el documento es realmente sensible —datos personales, información confidencial—
+  no va acá. Guardalo en un servicio con enlaces protegidos y generá el QR de esa
+  dirección con la pestaña «Cualquier enlace».
 
 ## El generador de códigos
 
