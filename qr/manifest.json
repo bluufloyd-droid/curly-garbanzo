@@ -1,0 +1,17 @@
+{
+  "name": "QR de Documentos",
+  "short_name": "QR",
+  "description": "Genera el código QR que lleva a un documento publicado, listo para imprimir o compartir.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "orientation": "any",
+  "lang": "es",
+  "categories": ["utilities", "productivity"],
+  "icons": [
+    { "src": "icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

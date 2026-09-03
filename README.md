@@ -81,6 +81,18 @@ cambios hay que subir el número de `CACHE` en `sw.js`.
 
 # Otras apps de este repositorio
 
+## QR de Documentos — [`qr/`](qr/)
+
+Genera el código QR que lleva a un documento tuyo publicado. El archivo se sube a la
+carpeta [`documentos/`](documentos/) —eso lo deja en línea, con una dirección fija— y la
+app arma el QR que apunta ahí, para descargar en PNG o SVG o mandar a la impresora.
+Quien lo escanea abre el documento en el navegador, sin instalar nada.
+
+Publicada en: **https://bluufloyd-droid.github.io/curly-garbanzo/qr/**
+
+El paso a paso para publicar un documento está en [`documentos/LEEME.md`](documentos/LEEME.md),
+y el detalle de la app en [`qr/README.md`](qr/README.md).
+
 ## Copiloto de Entrevista — [`entrevista/`](entrevista/)
 
 App para la computadora que se deja abierta durante una entrevista de trabajo en inglés:
