@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1117">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>QR de Documentos</title>
+<meta name="description" content="Genera el código QR que lleva a un documento publicado, listo para imprimir o compartir.">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icono.svg">
+<style>
+  :root{
+    --bg:#0d1117;
+    --panel:#161b22;
+    --panel-2:#1c232d;
+    --line:#2a323d;
+    --txt:#e6edf3;
+    --muted:#9aa7b4;
+    --acento:#3d9bff;
+    --ok:#2ecc71;
+    --danger:#ff5d5d;
+    --safe-top:env(safe-area-inset-top,0px);
+    --safe-bot:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt)}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.5;
+    padding:calc(16px + var(--safe-top)) 16px calc(32px + var(--safe-bot));
+  }
+  .hoja{max-width:1000px;margin:0 auto}
+
+  header h1{margin:0 0 4px;font-size:22px;letter-spacing:.2px}
+  header p{margin:0 0 20px;color:var(--muted);font-size:14px}
+
+  .columnas{display:grid;gap:18px;grid-template-columns:1fr}
+  @media (min-width:860px){
+    .columnas{grid-template-columns:1fr 340px;align-items:start}
+    .previa{position:sticky;top:16px}
+  }
+
+  section{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:16px;
+    margin-bottom:16px;
+  }
+  section h2{margin:0 0 12px;font-size:15px;font-weight:600;letter-spacing:.2px}
+  section h2 .paso{
+    display:inline-block;min-width:22px;height:22px;line-height:22px;text-align:center;
+    background:var(--panel-2);border:1px solid var(--line);border-radius:50%;
+    font-size:12px;color:var(--muted);margin-right:8px;
+  }
+
+  label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
+  label:first-of-type{margin-top:0}
+  input[type=text],input[type=url],select,textarea{
+    width:100%;padding:11px 12px;font:inherit;font-size:15px;
+    background:var(--panel-2);color:var(--txt);
+    border:1px solid var(--line);border-radius:10px;
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--acento);outline-offset:1px}
+  textarea{resize:vertical;min-height:74px}
+
+  .pestanas{display:flex;gap:6px;margin-bottom:14px;background:var(--panel-2);
+    border:1px solid var(--line);border-radius:10px;padding:4px}
+  .pestanas button{
+    flex:1;padding:9px 8px;font:inherit;font-size:14px;border:0;border-radius:7px;
+    background:transparent;color:var(--muted);cursor:pointer;
+  }
+  .pestanas button[aria-selected=true]{background:var(--acento);color:#fff;font-weight:600}
+
+  .fila{display:grid;gap:12px;grid-template-columns:1fr 1fr}
+  @media (max-width:520px){.fila{grid-template-columns:1fr}}
+
+  .destino{
+    margin-top:12px;padding:10px 12px;border-radius:10px;
+    background:var(--panel-2);border:1px dashed var(--line);
+    font-size:13px;word-break:break-all;
+  }
+  .destino span{color:var(--muted);display:block;margin-bottom:2px;font-size:12px}
+  .destino a{color:var(--acento)}
+
+  .previa .marco{
+    background:#fff;border-radius:12px;padding:16px;display:flex;
+    flex-direction:column;align-items:center;gap:10px;
+  }
+  .previa canvas{width:100%;height:auto;image-rendering:pixelated;max-width:280px}
+  .previa .pie{color:#111;font-size:13px;text-align:center;word-break:break-word;font-weight:600}
+  .datos{margin-top:10px;color:var(--muted);font-size:12px;text-align:center}
+
+  .acciones{display:grid;gap:8px;grid-template-columns:1fr 1fr;margin-top:14px}
+  button.accion{
+    padding:11px 10px;font:inherit;font-size:14px;font-weight:600;cursor:pointer;
+    background:var(--panel-2);color:var(--txt);
+    border:1px solid var(--line);border-radius:10px;
+  }
+  button.accion:hover{border-color:var(--acento)}
+  button.accion.principal{background:var(--acento);border-color:var(--acento);color:#fff}
+  button.accion:disabled{opacity:.45;cursor:default}
+
+  .aviso{margin-top:12px;padding:10px 12px;border-radius:10px;font-size:13px;display:none}
+  .aviso.error{display:block;background:rgba(255,93,93,.12);border:1px solid rgba(255,93,93,.4);color:#ffc9c9}
+  .aviso.info{display:block;background:rgba(61,155,255,.12);border:1px solid rgba(61,155,255,.35);color:#cfe6ff}
+  .aviso.ok{display:block;background:rgba(46,204,113,.12);border:1px solid rgba(46,204,113,.35);color:#c8f5da}
+
+  details{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
+  summary{cursor:pointer;font-size:14px;color:var(--muted)}
+  details p{font-size:13px;color:var(--muted)}
+  details code{background:var(--panel-2);padding:1px 5px;border-radius:5px;font-size:12px}
+
+  footer{margin-top:8px;color:var(--muted);font-size:12px;text-align:center}
+  footer a{color:var(--acento)}
+
+  /* Al imprimir queda sólo el código, grande y centrado en la hoja. */
+  @media print{
+    body{background:#fff;color:#000;padding:0}
+    header,form,.acciones,.datos,footer,details,.aviso{display:none !important}
+    .columnas{display:block}
+    .previa .marco{padding:0;min-height:90vh;justify-content:center}
+    .previa canvas{max-width:min(16cm,90vw)}
+    .previa .pie{font-size:16pt;margin-top:12px}
+  }
+</style>
+</head>
+<body>
+<div class="hoja">
+
+<header>
+  <h1>QR de Documentos</h1>
+  <p>Armá el código QR que lleva a tu documento publicado. Quien lo escanee abre el
+     archivo en el navegador, sin instalar nada.</p>
+</header>
+
+<div class="columnas">
+
+  <form id="formulario" autocomplete="off">
+    <section>
+      <h2><span class="paso">1</span>¿A dónde lleva el código?</h2>
+
+      <div class="pestanas" role="tablist">
+        <button type="button" role="tab" id="tab-doc" aria-selected="true">Un documento publicado</button>
+        <button type="button" role="tab" id="tab-url" aria-selected="false">Cualquier enlace</button>
+      </div>
+
+      <div id="panel-doc">
+        <label for="documento">Documento</label>
+        <select id="documento"></select>
+        <div id="aviso-lista" class="aviso"></div>
+      </div>
+
+      <div id="panel-url" hidden>
+        <label for="enlace">Dirección completa</label>
+        <input type="url" id="enlace" placeholder="https://ejemplo.com/mi-documento.pdf"
+               inputmode="url" spellcheck="false">
+      </div>
+
+      <div class="destino">
+        <span>El QR va a abrir:</span>
+        <a id="destino-texto" href="#" target="_blank" rel="noopener">—</a>
+      </div>
+    </section>
+
+    <section>
+      <h2><span class="paso">2</span>Cómo se ve</h2>
+
+      <label for="pie">Texto debajo del código <span style="opacity:.7">(opcional)</span></label>
+      <input type="text" id="pie" maxlength="70" placeholder="Escaneá para ver el documento">
+
+      <div class="fila">
+        <div>
+          <label for="correccion">Corrección de errores</label>
+          <select id="correccion">
+            <option value="L">Baja — el código más chico</option>
+            <option value="M" selected>Media — recomendada</option>
+            <option value="Q">Alta</option>
+            <option value="H">Máxima — aguanta manchas y dobleces</option>
+          </select>
+        </div>
+        <div>
+          <label for="tamano">Tamaño al descargar</label>
+          <select id="tamano">
+            <option value="512">512 px — pantalla</option>
+            <option value="1024" selected>1024 px — impresión</option>
+            <option value="2048">2048 px — cartel</option>
+          </select>
+        </div>
+      </div>
+
+      <details>
+        <summary>¿Cuál corrección conviene?</summary>
+        <p>Cuanto más alta, más se puede ensuciar o tapar el código sin que deje de leerse,
+           pero el dibujo tiene más puntos y hay que imprimirlo más grande. Para una hoja
+           pegada en la pared, <strong>Media</strong> alcanza; para una etiqueta que se
+           va a manosear, usá <strong>Máxima</strong>.</p>
+      </details>
+    </section>
+  </form>
+
+  <div class="previa">
+    <section>
+      <h2><span class="paso">3</span>Tu código</h2>
+      <div class="marco">
+        <canvas id="lienzo" width="256" height="256" aria-label="Código QR generado"></canvas>
+        <div class="pie" id="pie-previa" hidden></div>
+      </div>
+      <div class="datos" id="datos">—</div>
+
+      <div class="acciones">
+        <button type="button" class="accion principal" id="btn-png">Descargar PNG</button>
+        <button type="button" class="accion" id="btn-svg">Descargar SVG</button>
+        <button type="button" class="accion" id="btn-copiar">Copiar enlace</button>
+        <button type="button" class="accion" id="btn-imprimir">Imprimir</button>
+      </div>
+      <div id="aviso-qr" class="aviso"></div>
+    </section>
+  </div>
+
+</div>
+
+<footer>
+  Los documentos se publican desde la carpeta <code>documentos/</code> de este mismo repositorio.
+  <a id="link-carpeta" href="../documentos/">Ver la lista</a>.
+</footer>
+
+</div>
+
+<script src="qr.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // Dirección del sitio publicado. Si la app se abre desde un archivo suelto
+  // (file://) no hay sitio del cual colgarse, así que se usa la publicada.
+  var BASE_PUBLICADA = "https://bluufloyd-droid.github.io/curly-garbanzo/";
+  var base = location.protocol === "file:"
+    ? BASE_PUBLICADA
+    : new URL("../", location.href).href;
+
+  var el = function(id){ return document.getElementById(id); };
+  var tabDoc = el("tab-doc"), tabUrl = el("tab-url");
+  var panelDoc = el("panel-doc"), panelUrl = el("panel-url");
+  var selDoc = el("documento"), inpUrl = el("enlace");
+  var inpPie = el("pie"), selEc = el("correccion"), selTam = el("tamano");
+  var lienzo = el("lienzo"), piePrevia = el("pie-previa"), datos = el("datos");
+  var destino = el("destino-texto");
+  var avisoLista = el("aviso-lista"), avisoQr = el("aviso-qr");
+  var modo = "doc";
+  var actual = null;   // último QR generado
+
+  el("link-carpeta").href = base + "documentos/";
+
+  function aviso(nodo, texto, clase){
+    nodo.textContent = texto || "";
+    nodo.className = "aviso" + (texto ? " " + clase : "");
+  }
+
+  // ---- Lista de documentos publicados ------------------------------------
+  function opcion(valor, texto){
+    var o = document.createElement("option");
+    o.value = valor; o.textContent = texto;
+    return o;
+  }
+
+  function cargarDocumentos(){
+    selDoc.appendChild(opcion(base + "documentos/", "Todos los documentos (la lista completa)"));
+    return fetch(base + "documentos/documentos.json", { cache: "no-cache" })
+      .then(function(r){
+        if(!r.ok) throw new Error("no se pudo leer documentos.json");
+        return r.json();
+      })
+      .then(function(datos){
+        var lista = (datos && datos.documentos) || [];
+        lista.forEach(function(doc){
+          if(!doc || !doc.archivo) return;
+          var url = base + "documentos/" + doc.archivo;
+          selDoc.appendChild(opcion(url, doc.titulo || doc.archivo));
+        });
+        if(!lista.length){
+          aviso(avisoLista,
+            "Todavía no hay documentos cargados. Subí el archivo a la carpeta documentos/ " +
+            "y anotalo en documentos.json; también podés usar la pestaña «Cualquier enlace».",
+            "info");
+        }
+      })
+      .catch(function(){
+        aviso(avisoLista,
+          "No se pudo leer la lista de documentos (pasa al abrir la app sin conexión o " +
+          "desde un archivo suelto). Usá la pestaña «Cualquier enlace».", "info");
+      });
+  }
+
+  // ---- Qué texto va adentro del código -----------------------------------
+  function contenido(){
+    return modo === "doc" ? selDoc.value : inpUrl.value.trim();
+  }
+
+  function mostrarDestino(texto){
+    destino.textContent = texto || "—";
+    if(texto && /^https?:\/\//i.test(texto)){
+      destino.href = texto;
+      destino.removeAttribute("aria-disabled");
+    } else {
+      destino.removeAttribute("href");
+    }
+  }
+
+  // ---- Dibujo ------------------------------------------------------------
+  var MARGEN = 4;  // módulos de zona de silencio, el mínimo que pide el estándar
+
+  function dibujar(matriz, lienzo, ladoPx){
+    var total = matriz.size + MARGEN * 2;
+    var escala = Math.max(1, Math.floor(ladoPx / total));
+    var lado = escala * total;
+    lienzo.width = lado;
+    lienzo.height = lado;
+    var ctx = lienzo.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, lado, lado);
+    ctx.fillStyle = "#000000";
+    for(var r = 0; r < matriz.size; r++){
+      for(var c = 0; c < matriz.size; c++){
+        if(matriz.get(r, c)){
+          ctx.fillRect((c + MARGEN) * escala, (r + MARGEN) * escala, escala, escala);
+        }
+      }
+    }
+    return lado;
+  }
+
+  function svg(matriz, pie){
+    var total = matriz.size + MARGEN * 2;
+    var altoPie = pie ? 6 : 0;
+    var partes = [];
+    for(var r = 0; r < matriz.size; r++){
+      // Cada tramo seguido de módulos oscuros se dibuja como un solo rectángulo.
+      var c = 0;
+      while(c < matriz.size){
+        if(!matriz.get(r, c)){ c++; continue; }
+        var largo = 1;
+        while(c + largo < matriz.size && matriz.get(r, c + largo)) largo++;
+        partes.push('<rect x="' + (c + MARGEN) + '" y="' + (r + MARGEN) +
+                    '" width="' + largo + '" height="1"/>');
+        c += largo;
+      }
+    }
+    var texto = pie
+      ? '<text x="' + (total / 2) + '" y="' + (total + 3.6) + '" text-anchor="middle" ' +
+        'font-family="Helvetica,Arial,sans-serif" font-size="2.6" font-weight="600" ' +
+        'fill="#000">' + pie.replace(/[<>&]/g, function(ch){
+            return ch === "<" ? "&lt;" : ch === ">" ? "&gt;" : "&amp;";
+          }) + '</text>'
+      : "";
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + total + ' ' + (total + altoPie) + '" ' +
+      'width="' + (total * 8) + '" height="' + ((total + altoPie) * 8) + '" shape-rendering="crispEdges">' +
+      '<rect width="100%" height="100%" fill="#ffffff"/>' +
+      '<g fill="#000000">' + partes.join("") + '</g>' + texto + '</svg>\n';
+  }
+
+  // ---- Generación --------------------------------------------------------
+  function generar(){
+    var texto = contenido();
+    mostrarDestino(texto);
+    var pie = inpPie.value.trim();
+    piePrevia.textContent = pie;
+    piePrevia.hidden = !pie;
+
+    if(!texto){
+      actual = null;
+      lienzo.getContext("2d").clearRect(0, 0, lienzo.width, lienzo.height);
+      datos.textContent = "Elegí un documento o pegá un enlace.";
+      aviso(avisoQr, "", "");
+      habilitar(false);
+      return;
+    }
+
+    try{
+      var matriz = qrMatrix(texto, { ec: selEc.value });
+    }catch(e){
+      actual = null;
+      datos.textContent = "—";
+      aviso(avisoQr, "El texto es demasiado largo para un código QR. Probá con un enlace más corto.", "error");
+      habilitar(false);
+      return;
+    }
+
+    actual = { matriz: matriz, texto: texto, pie: pie };
+    dibujar(matriz, lienzo, 33 * matriz.size);
+    datos.textContent = "Versión " + matriz.version + " · corrección " + matriz.ec +
+                        " · " + matriz.size + "×" + matriz.size + " módulos";
+    aviso(avisoQr, "", "");
+    habilitar(true);
+  }
+
+  function habilitar(si){
+    ["btn-png", "btn-svg", "btn-copiar", "btn-imprimir"].forEach(function(id){
+      el(id).disabled = !si;
+    });
+  }
+
+  // ---- Descargas ---------------------------------------------------------
+  function nombreArchivo(ext){
+    var texto = actual ? actual.texto : "codigo";
+    var ultimo = texto.split("?")[0].split("#")[0].split("/").filter(Boolean).pop() || "codigo";
+    return "qr-" + ultimo.replace(/[^\w.-]+/g, "-").replace(/\.[^.]*$/, "") + "." + ext;
+  }
+
+  function bajar(url, nombre){
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = nombre;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  el("btn-png").addEventListener("click", function(){
+    if(!actual) return;
+    var lado = parseInt(selTam.value, 10);
+    var fuera = document.createElement("canvas");
+    var ladoQr = dibujar(actual.matriz, fuera, lado);
+
+    // Con texto al pie hace falta una segunda tela, más alta, para el renglón.
+    if(actual.pie){
+      var alto = Math.round(ladoQr * 1.14);
+      var hoja = document.createElement("canvas");
+      hoja.width = ladoQr;
+      hoja.height = alto;
+      var ctx = hoja.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, ladoQr, alto);
+      ctx.drawImage(fuera, 0, 0);
+      ctx.fillStyle = "#000000";
+      ctx.textAlign = "center";
+      ctx.font = "600 " + Math.round(ladoQr * 0.045) + "px Helvetica,Arial,sans-serif";
+      ctx.fillText(actual.pie, ladoQr / 2, ladoQr + (alto - ladoQr) * 0.62, ladoQr * 0.94);
+      fuera = hoja;
+    }
+    bajar(fuera.toDataURL("image/png"), nombreArchivo("png"));
+  });
+
+  el("btn-svg").addEventListener("click", function(){
+    if(!actual) return;
+    var texto = svg(actual.matriz, actual.pie);
+    var url = URL.createObjectURL(new Blob([texto], { type: "image/svg+xml" }));
+    bajar(url, nombreArchivo("svg"));
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  });
+
+  el("btn-copiar").addEventListener("click", function(){
+    if(!actual) return;
+    var listo = function(){ aviso(avisoQr, "Enlace copiado.", "ok"); };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(actual.texto).then(listo, function(){
+        aviso(avisoQr, "No se pudo copiar; el enlace está arriba, en «El QR va a abrir».", "error");
+      });
+    } else {
+      aviso(avisoQr, "Este navegador no deja copiar solo; el enlace está arriba.", "info");
+    }
+  });
+
+  el("btn-imprimir").addEventListener("click", function(){ window.print(); });
+
+  // ---- Pestañas ----------------------------------------------------------
+  function cambiarModo(nuevo){
+    modo = nuevo;
+    var esDoc = modo === "doc";
+    tabDoc.setAttribute("aria-selected", String(esDoc));
+    tabUrl.setAttribute("aria-selected", String(!esDoc));
+    panelDoc.hidden = !esDoc;
+    panelUrl.hidden = esDoc;
+    generar();
+  }
+  tabDoc.addEventListener("click", function(){ cambiarModo("doc"); });
+  tabUrl.addEventListener("click", function(){ cambiarModo("url"); });
+
+  ["documento", "enlace", "pie", "correccion", "tamano"].forEach(function(id){
+    el(id).addEventListener("input", generar);
+    el(id).addEventListener("change", generar);
+  });
+
+  // Con ?url=... o ?doc=archivo.pdf se puede llegar con el destino ya cargado.
+  function desdeLaDireccion(){
+    var p = new URLSearchParams(location.search);
+    if(p.get("url")){
+      inpUrl.value = p.get("url");
+      cambiarModo("url");
+      return true;
+    }
+    if(p.get("doc")){
+      var url = base + "documentos/" + p.get("doc");
+      for(var i = 0; i < selDoc.options.length; i++){
+        if(selDoc.options[i].value === url){ selDoc.selectedIndex = i; return false; }
+      }
+      inpUrl.value = url;
+      cambiarModo("url");
+      return true;
+    }
+    return false;
+  }
+
+  cargarDocumentos().then(function(){
+    desdeLaDireccion();
+    generar();
+  });
+
+  if("serviceWorker" in navigator){
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("sw.js").catch(function(){});
+    });
+  }
+})();
+</script>
+</body>
+</html>
