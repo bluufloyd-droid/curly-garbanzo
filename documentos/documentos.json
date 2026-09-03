@@ -1,6 +1,11 @@
 {
   "documentos": [
     {
+      "archivo": "certificado-homologacion-chinalco-sgs.pdf",
+      "titulo": "Certificado de Homologación Chinalco - SGS",
+      "descripcion": "Homologación de proveedor emitida por SGS."
+    },
+    {
       "archivo": "ejemplo.pdf",
       "titulo": "Documento de ejemplo",
       "descripcion": "Archivo de prueba, para ver el circuito completo funcionando. Borralo cuando publiques el tuyo."
