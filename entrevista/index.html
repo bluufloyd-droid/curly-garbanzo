@@ -462,12 +462,32 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
       <div class="campo">
         <label>Idioma del entrevistador</label>
         <select id="cfIdiomaOrigen">
+          <option value="es-PE">Español (Perú)</option>
+          <option value="es-419">Español (Latinoamérica)</option>
+          <option value="es-ES">Español (España)</option>
           <option value="en-US">Inglés (EE.UU.)</option>
           <option value="en-GB">Inglés (Reino Unido)</option>
           <option value="en-AU">Inglés (Australia)</option>
           <option value="en-IN">Inglés (India)</option>
           <option value="pt-BR">Portugués (Brasil)</option>
         </select>
+      </div>
+    </div>
+
+    <div class="campo">
+      <label>Idioma de las respuestas y del speech</label>
+      <p class="ayuda">
+        Si la entrevista es en español, la app deja de traducir y funciona como ayuda de memoria:
+        escucha en español y te sugiere qué contestar en español, con tu perfil. Cada idioma guarda
+        su propio speech.
+      </p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="cfIdiomaRespuesta" style="flex:1 1 220px">
+          <option value="en">Inglés</option>
+          <option value="es">Español</option>
+        </select>
+        <button class="btn mini" id="btnPresetEs">Entrevista en español</button>
+        <button class="btn mini" id="btnPresetEn">Entrevista en inglés</button>
       </div>
     </div>
 
@@ -545,7 +565,7 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
    Todo corre en el navegador. Los datos quedan en localStorage.
    ========================================================================= */
 
-const VERSION = 'v12';   // subir junto con CACHE en sw.js al publicar cambios
+const VERSION = 'v13';   // subir junto con CACHE en sw.js al publicar cambios
 const SDK_URL = './vendor/anthropic.mjs';   // SDK oficial de Anthropic, copia local (ver vendor/LEEME.md)
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -559,7 +579,7 @@ const store = {
 };
 
 const CFG_DEF = {
-  clave:'', claveDeepgram:'', motor:'chrome', dispositivo:'',
+  clave:'', claveDeepgram:'', motor:'chrome', dispositivo:'', idiomaRespuesta:'en',
   modelo:'claude-opus-5', modeloTraduccion:'claude-haiku-4-5', idiomaOrigen:'en-US',
   traducir:true, anticipada:true, autoResponder:false, rapido:false,
   fs:1, soloEs:false, vista:0, notas:''
@@ -568,7 +588,10 @@ const PERFIL_DEF = { nombre:'', puesto:'', empresa:'', cv:'', logros:'', proyect
 
 let cfg    = Object.assign({}, CFG_DEF, store.get('cfg', {}));
 let perfil = Object.assign({}, PERFIL_DEF, store.get('perfil', {}));
-let speech = store.get('speech', null);          // { fecha, texto }
+/* Un speech por idioma: el de inglés no se pierde al preparar uno en español. */
+const claveSpeech = () => 'speech.' + (cfg.idiomaRespuesta || 'en');
+if (store.get('speech', null) && !store.get('speech.en', null)) store.set('speech.en', store.get('speech', null));
+let speech = store.get(claveSpeech(), null);          // { fecha, texto }
 let lineas = store.get('lineas', []);            // transcripción de la sesión
 
 /* ------------------------------ utilidades ----------------------------- */
@@ -768,7 +791,7 @@ function systemRespuesta(modo){
 Te paso lo que acaba de preguntar el entrevistador y tenés que darle, en segundos, qué contestar.
 
 Reglas:
-- La respuesta va EN INGLÉS, en primera persona, con el tono de alguien senior, cálido y concreto. Nada de jerga vacía.
+- La respuesta va EN ${nombreIdiomaRta().toUpperCase()}, en primera persona, con el tono de alguien senior, cálido y concreto. Nada de jerga vacía.
 - Apoyate ÚNICAMENTE en los datos del perfil. Si algo no está, no lo inventes: preferí una formulación honesta y general antes que un dato falso.
 - Priorizá siempre un logro con número por sobre una declaración de intenciones. Cada viñeta tiene que traer un dato concreto: una cifra, un nombre de operación, un plazo o un tamaño de equipo. Una viñeta sin dato es una viñeta desperdiciada.
 - Cuando la pregunta pida una experiencia, usá estructura STAR comprimida (situación, qué hiciste, resultado con número).
@@ -782,8 +805,7 @@ FORMATO DE SALIDA — respetalo al pie de la letra, la pantalla lo parsea.
 - <punto clave 3, con dato>
 - <punto clave 4, solo si aporta algo nuevo>
 **Close:** <una frase para cerrar>
-_ES: <una línea en español con la idea central, para que la chequee de un vistazo>_
-
+${cfg.idiomaRespuesta === 'es' ? '' : '_ES: <una línea en español con la idea central, para que la chequee de un vistazo>_\n'}
 Nada más que eso. Sin encabezados, sin alternativas, sin comentarios: otra llamada se ocupa de las opciones.`;
 
   const alternativas =
@@ -792,7 +814,7 @@ Ya se le dio una respuesta a la pregunta del entrevistador. Tu tarea ahora es da
 
 Reglas:
 - Cada alternativa es otra respuesta posible a la MISMA pregunta, apoyada en una historia o un ángulo distinto del perfil. Nunca repitas el de la respuesta que ya se dio.
-- Van en inglés, en primera persona, listas para decir en voz alta tal cual. No son resúmenes ni notas.
+- Van en ${nombreIdiomaRta()}, en primera persona, listas para decir en voz alta tal cual. No son resúmenes ni notas.
 - Solo datos del perfil. Nada inventado.
 - Si la pregunta admite una sola respuesta honesta, devolvé una sola alternativa o ninguna. No rellenes.
 
@@ -801,8 +823,7 @@ FORMATO — respetalo al pie de la letra, la pantalla lo parsea. Cada alternativ
 **Opener:** <una frase>
 - <punto con dato>
 - <punto con dato>
-**Close:** <una frase>
-_ES: <una línea en español>_`;
+**Close:** <una frase>${cfg.idiomaRespuesta === 'es' ? '' : '\n_ES: <una línea en español>_'}`;
 
   const perf = bloquePerfil();
   const texto = modo === 'alternativas' ? alternativas : instrucciones;
@@ -967,8 +988,13 @@ function pintarEnCurso(en){
     el.innerHTML = '<p class="en" data-ien></p><p class="es" data-ies></p>';
     $('#cuerpoVivo').appendChild(el);
   }
-  el.querySelector('[data-ien]').textContent = en;
-  el.querySelector('[data-ies]').textContent = dgEsAcum;
+  if (hayTraduccion()){
+    el.querySelector('[data-ien]').textContent = en;
+    el.querySelector('[data-ies]').textContent = dgEsAcum;
+  } else {
+    el.querySelector('[data-ien]').textContent = '';
+    el.querySelector('[data-ies]').textContent = en;
+  }
   autoScroll($('#cuerpoVivo'));
 }
 
@@ -976,7 +1002,7 @@ function pintarEnCurso(en){
    secuencial para que los tramos no se adelanten unos a otros y el texto salga
    en el orden en que se dijo. */
 function encolarSegmento(t){
-  if (!cfg.traducir || !cfg.clave || !t.trim()) return;
+  if (!hayTraduccion() || !t.trim()) return;
   const contexto = dgFinales.slice(0, Math.max(0, dgFinales.length - t.length)).slice(-160).trim();
   const idioma = NOMBRE_IDIOMA[(cfg.idiomaOrigen||'en').slice(0,2)] || 'inglés';
   dgCola = dgCola.then(async () => {
@@ -1192,7 +1218,7 @@ function agregarLinea(texto, esYaTraducido){
   pintarLinea(l);
   guardarLineas();
   if (l.preg) ultimaPregunta = l;
-  if (!l.es && cfg.traducir && cfg.clave) encolar(l);
+  if (!l.es && hayTraduccion()) encolar(l);
   if (l.preg && cfg.autoResponder && cfg.clave){
     clearTimeout(autoTimer);
     autoTimer = setTimeout(() => responder(l.en), 900);
@@ -1211,9 +1237,10 @@ function pintarLinea(l){
   div.className = 'linea' + (l.preg ? ' preg' : '');
   div.id = l.id;
   div.innerHTML =
-    '<p class="en">' + esc(l.en) + '</p>' +
-    '<p class="es ' + (l.es ? '' : 'pend') + '" data-es>' +
-      (l.es ? esc(l.es) : (cfg.traducir && cfg.clave ? esc(l.esFijado || 'traduciendo…') : '')) + '</p>' +
+    (hayTraduccion() || l.es
+      ? '<p class="en">' + esc(l.en) + '</p>' +
+        '<p class="es ' + (l.es ? '' : 'pend') + '" data-es>' + (l.es ? esc(l.es) : esc(l.esFijado || 'traduciendo…')) + '</p>'
+      : '<p class="es" data-es>' + esc(l.en) + '</p>') +
     '<div class="meta"><span class="hora">' + hora(l.ts) + '</span>' +
       (l.preg ? '<span class="chip">pregunta</span><button class="btn mini" data-responder="'+l.id+'">Responder esto</button>' : '') +
     '</div>';
@@ -1237,7 +1264,7 @@ function pintarInterina(txt){
   }
   el.querySelector('[data-ien]').textContent = txt;
   autoScroll($('#cuerpoVivo'));
-  if (cfg.motor !== 'deepgram' && cfg.anticipada && cfg.traducir && cfg.clave) programarAnticipada(txt);
+  if (cfg.motor !== 'deepgram' && cfg.anticipada && hayTraduccion()) programarAnticipada(txt);
 }
 
 function mostrarProvisional(txt){
@@ -1331,7 +1358,12 @@ Devolvés solamente la traducción del tramo, nada más.` + glosario(tramo),
 
 /* ============================== TRADUCCIÓN ============================= */
 const cola = []; let activos = 0;
-const NOMBRE_IDIOMA = { en:'inglés', pt:'portugués' };
+const NOMBRE_IDIOMA = { en:'inglés', pt:'portugués', es:'español' };
+const idiomaBase = () => (cfg.idiomaOrigen || 'en').slice(0,2);
+/* Con la entrevista en español no hay nada que traducir: la app pasa a ser
+   ayuda de memoria. Centralizado acá para que ninguna ruta traduzca de más. */
+const hayTraduccion = () => !!cfg.traducir && !!cfg.clave && idiomaBase() !== 'es';
+const nombreIdiomaRta = () => cfg.idiomaRespuesta === 'es' ? 'español' : 'inglés';
 
 function encolar(l){ cola.push(l); bombear(); }
 function bombear(){
@@ -1546,7 +1578,7 @@ async function ampliar(){
   cont.appendChild(extra);
   $('#btnAmpliar').disabled = true;
   const msgs = histRta.concat([{ role:'user', content:
-    'Ampliá la respuesta: contame la historia completa en inglés con estructura STAR (situación, tarea, acción, resultado con número), en no más de 200 palabras, lista para decir en voz alta. Después agregá una línea "_ES: …_" con la idea en español.' }]);
+    'Ampliá la respuesta: contame la historia completa en ' + nombreIdiomaRta() + ' con estructura STAR (situación, tarea, acción, resultado con número), en no más de 200 palabras, lista para decir en voz alta. Después agregá una línea "_ES: …_" con la idea en español.' }]);
   try {
     const t = await pedir({ system: systemRespuesta(), messages: msgs, maxTokens: 1600, esfuerzo: 'low',
       onDelta: x => { $('#cuerpoAmp').innerHTML = md(x); } });
@@ -1589,8 +1621,7 @@ async function generarSpeech(){
 Escribí un documento de respaldo que va a estar abierto en pantalla durante la entrevista: se lee de reojo, no se recita.
 
 Reglas:
-- El texto que el candidato va a decir va EN INGLÉS, en primera persona.
-- Debajo de cada bloque en inglés, una línea corta en español que resuma la idea, así la ubica de un vistazo.
+- El texto que el candidato va a decir va EN ${nombreIdiomaRta().toUpperCase()}, en primera persona.${cfg.idiomaRespuesta === 'es' ? '' : '\n- Debajo de cada bloque en inglés, una línea corta en español que resuma la idea, así la ubica de un vistazo.'}
 - Todo tiene que salir del perfil. Prohibido inventar empresas, cifras, fechas o títulos. Si falta un dato, escribí [COMPLETAR: …].
 - Priorizá logros con números. Frases cortas, viñetas, nada de párrafos largos.
 - Alineá cada sección con la descripción del puesto cuando exista.
@@ -1607,7 +1638,7 @@ ${SECCIONES_PEDIDAS.map((s,i)=>(i+1)+'. '+s).join('\n')}`;
       onDelta: t => { const e = $('#speechStream'); if (e){ e.textContent = t.slice(-1200); } }
     });
     speech = { fecha: Date.now(), texto: txt };
-    store.set('speech', speech);
+    store.set(claveSpeech(), speech);
     pintarSpeech();
     avisar('Speech listo. Queda guardado hasta que lo vuelvas a generar.');
   } catch(e){
@@ -1746,6 +1777,7 @@ function cargarAjustesEnFormulario(){
   $('#cfModelo').value       = cfg.modelo;
   $('#cfModeloTraduccion').value = cfg.modeloTraduccion;
   $('#cfIdiomaOrigen').value = cfg.idiomaOrigen;
+  $('#cfIdiomaRespuesta').value = cfg.idiomaRespuesta;
   $('#cfTraducir').checked   = cfg.traducir;
   $('#cfAnticipada').checked = cfg.anticipada;
   $('#cfAutoResponder').checked = cfg.autoResponder;
@@ -1759,6 +1791,7 @@ function guardarAjustes(){
   cfg.modelo       = $('#cfModelo').value;
   cfg.modeloTraduccion = $('#cfModeloTraduccion').value;
   cfg.idiomaOrigen = $('#cfIdiomaOrigen').value;
+  cfg.idiomaRespuesta = $('#cfIdiomaRespuesta').value;
   cfg.traducir     = $('#cfTraducir').checked;
   cfg.anticipada   = $('#cfAnticipada').checked;
   cfg.autoResponder= $('#cfAutoResponder').checked;
@@ -1766,6 +1799,7 @@ function guardarAjustes(){
   store.set('cfg', cfg);
   nivelParams = 0; cliente = null;
   if (rec && escuchando) rec.lang = cfg.idiomaOrigen;
+  speech = store.get(claveSpeech(), null); pintarSpeech();
   msgEn('#msgAjustes', '✓ Ajustes guardados.');
   avisar('Ajustes guardados.');
 }
@@ -1860,6 +1894,8 @@ $('#btnGuardarAjustes').onclick= guardarAjustes;
 $('#btnProbar').onclick        = probarConexion;
 $('#btnDispositivos').onclick  = () => { const s = $('#cfDispositivo'); delete s.dataset.listo; pintarDispositivos(); };
 $('#cfMotor').onchange         = mostrarCampoDeepgram;
+$('#btnPresetEs').onclick = () => { $('#cfIdiomaOrigen').value='es-PE'; $('#cfIdiomaRespuesta').value='es'; $('#cfTraducir').checked=false; guardarAjustes(); msgEn('#msgAjustes','✓ Modo entrevista en español: escucha en español, sin traducción, respuestas y speech en español.'); };
+$('#btnPresetEn').onclick = () => { $('#cfIdiomaOrigen').value='en-US'; $('#cfIdiomaRespuesta').value='en'; $('#cfTraducir').checked=true;  guardarAjustes(); msgEn('#msgAjustes','✓ Modo entrevista en inglés: escucha en inglés, traducción al español, respuestas en inglés.'); };
 $('#btnActualizar').onclick    = forzarActualizacion;
 $('#btnGenerarSpeech').onclick = () => { guardarPerfil(); generarSpeech(); };
 
@@ -1879,7 +1915,7 @@ $('#fileImportar').onchange = async e => {
   try {
     const d = JSON.parse(await f.text());
     perfil = Object.assign({}, PERFIL_DEF, d.perfil || d);
-    if (d.speech){ speech = d.speech; store.set('speech', speech); pintarSpeech(); }
+    if (d.speech){ speech = d.speech; store.set(claveSpeech(), speech); pintarSpeech(); }
     store.set('perfil', perfil); cargarPerfilEnFormulario();
     msgEn('#msgPerfil', '✓ Perfil importado.');
     avisar('Perfil importado.');
