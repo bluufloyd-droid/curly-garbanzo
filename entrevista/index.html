@@ -565,7 +565,7 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
    Todo corre en el navegador. Los datos quedan en localStorage.
    ========================================================================= */
 
-const VERSION = 'v13';   // subir junto con CACHE en sw.js al publicar cambios
+const VERSION = 'v14';   // subir junto con CACHE en sw.js al publicar cambios
 const SDK_URL = './vendor/anthropic.mjs';   // SDK oficial de Anthropic, copia local (ver vendor/LEEME.md)
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -793,6 +793,8 @@ Te paso lo que acaba de preguntar el entrevistador y tenés que darle, en segund
 Reglas:
 - La respuesta va EN ${nombreIdiomaRta().toUpperCase()}, en primera persona, con el tono de alguien senior, cálido y concreto. Nada de jerga vacía.
 - Apoyate ÚNICAMENTE en los datos del perfil. Si algo no está, no lo inventes: preferí una formulación honesta y general antes que un dato falso.
+- Si hay un bloque <ya_respondido_en_esta_entrevista>, NO vuelvas a usar la misma historia ni el mismo logro como eje de esta respuesta. El perfil tiene muchas: elegí la que mejor responda a ESTA pregunta en particular. Repetir la misma historia ante preguntas distintas suena a guion, y el entrevistador lo nota.
+- Las historias marcadas en el perfil como "las que más rinden" son para cuando encajan, no para todas las preguntas. Una pregunta sobre liderazgo de personas se contesta con personas, no con el depósito de relaves.
 - Priorizá siempre un logro con número por sobre una declaración de intenciones. Cada viñeta tiene que traer un dato concreto: una cifra, un nombre de operación, un plazo o un tamaño de equipo. Una viñeta sin dato es una viñeta desperdiciada.
 - Cuando la pregunta pida una experiencia, usá estructura STAR comprimida (situación, qué hiciste, resultado con número).
 - Hasta 180 palabras en la respuesta principal. Frases cortas, para leer de reojo.
@@ -1063,7 +1065,9 @@ let buffer = '', bufferTimer = null;
 let ultimoAudio = 0, vigilanteVoz = null, refrescoVoz = null;
 
 const RE_PREGUNTA = /(^|\s)(what|how|why|when|where|who|which|whose|can you|could you|would you|will you|do you|did you|does|have you|has|are you|is there|is it|tell me|walk me|describe|explain|give me|talk about|share|any experience|what's|how's|why's)\b/i;
-const esPregunta = t => /\?\s*$/.test(t.trim()) || RE_PREGUNTA.test(t.trim().slice(0, 60));
+const RE_PREGUNTA_ES = /(^|\s)(qué|que|cómo|como|cuál|cual|cuáles|cuales|por qué|porque|cuándo|cuando|dónde|donde|quién|quien|cuánto|cuanto|cuéntame|cuentame|cuéntanos|cuentanos|dime|dinos|háblame|hablame|explícame|explicame|describe|describa|descríbeme|descríbenos|podrías|podria|puedes|tienes|has tenido|alguna vez)\b/i;
+const esPregunta = t => /[?？]\s*$/.test(t.trim()) || /^[¿]/.test(t.trim()) ||
+  RE_PREGUNTA.test(t.trim().slice(0, 60)) || RE_PREGUNTA_ES.test(t.trim().slice(0, 60));
 
 function iniciarEscucha(){
   if (cfg.motor === 'deepgram'){
@@ -1451,12 +1455,30 @@ function sellarTiempo(l, t0){
 
 /* ============================ RESPUESTA EN VIVO ======================== */
 let ctrlRta = null, histRta = null;
+/* Memoria de la entrevista: qué se preguntó y con qué historia se contestó.
+   Sin esto cada respuesta se armaba desde cero y el modelo volvía siempre a
+   la misma historia fuerte del perfil, pregunta tras pregunta. */
+let yaRespondido = store.get('yaRespondido', []);
+function recordarRespuesta(pregunta, texto){
+  const opener = (String(texto).match(/\*\*Opener:\*\*\s*([^\n]+)/) || [,''])[1] || String(texto).split('\n')[0];
+  yaRespondido.push({ pregunta: pregunta.slice(0,140), eje: opener.trim().slice(0,180) });
+  if (yaRespondido.length > 12) yaRespondido.shift();
+  store.set('yaRespondido', yaRespondido);
+}
 
 async function responder(pregunta){
   if (!cfg.clave){ abrirVista('#vistaAjustes'); avisar('Primero pegá tu clave de la API en Ajustes.', true); return; }
   pregunta = (pregunta || '').trim();
   if (!pregunta){
-    const ult = ultimaPregunta || lineas[lineas.length-1];
+    /* Se contesta LO ÚLTIMO QUE SE DIJO, no la última línea marcada como
+       pregunta. Si la transcripción no capturó el signo de interrogación, la
+       marca quedaba en una pregunta vieja y R la volvía a contestar: misma
+       respuesta para preguntas distintas. Si lo último es muy corto (un
+       "okay"), se toma lo último junto con la línea anterior. */
+    let ult = lineas[lineas.length-1];
+    if (ult && ult.en.trim().length < 25 && lineas.length > 1){
+      ult = { en: lineas[lineas.length-2].en + ' ' + ult.en };
+    }
     if (!ult){ avisar('Todavía no hay nada que responder.'); return; }
     pregunta = ult.en;
   }
@@ -1475,8 +1497,11 @@ async function responder(pregunta){
   $('#btnAmpliar').style.display = 'none';
 
   const contexto = lineas.slice(-6).map(x => x.en).join(' ');
+  const previas = yaRespondido.slice(-8).map((h, i) =>
+    (i+1) + '. Pregunta: "' + h.pregunta + '" → se contestó con: ' + h.eje).join('\n');
   const mensajes = [{ role:'user', content:
     '<contexto_de_la_charla>\n' + contexto + '\n</contexto_de_la_charla>\n\n' +
+    (previas ? '<ya_respondido_en_esta_entrevista>\n' + previas + '\n</ya_respondido_en_esta_entrevista>\n\n' : '') +
     '<pregunta_del_entrevistador>\n' + pregunta + '\n</pregunta_del_entrevistador>' }];
 
   const t0 = Date.now(); let tPrimera = 0;
@@ -1491,6 +1516,7 @@ async function responder(pregunta){
     const c = document.querySelector('.tarjeta .cargando'); if (c) c.remove();
     marcarTiempos(tPrimera, Date.now() - t0);
     histRta = mensajes.concat([{ role:'assistant', content: txt }]);
+    recordarRespuesta(pregunta, txt);
     $('#btnAmpliar').style.display = '';
     buscarAlternativas(mensajes, txt, ctrlRta.signal);   // no bloquea: ya puede leer
   } catch(e){
@@ -1929,7 +1955,7 @@ $('#fileImportar').onchange = async e => {
 $('#btnExportar').onclick = exportar;
 $('#btnLimpiar').onclick = () => {
   if (!confirm('¿Borrar la transcripción de esta sesión? El perfil y el speech no se tocan.')) return;
-  store.del('lineas');
+  store.del('lineas'); store.del('yaRespondido');
   location.reload();
 };
 $('#btnBorrarTodo').onclick = () => {
