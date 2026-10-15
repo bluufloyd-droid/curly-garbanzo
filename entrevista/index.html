@@ -65,6 +65,9 @@ button{cursor:pointer}
 .luz.on{background:var(--ok); box-shadow:0 0 0 0 rgba(63,185,80,.6); animation:pulso 1.8s infinite}
 .luz.err{background:var(--err)}
 .luz.wait{background:var(--warn)}
+.nivel{width:46px;height:6px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden;flex:0 0 auto;display:none}
+.nivel i{display:block;height:100%;width:0;background:var(--ok);transition:width .12s linear}
+.nivel.mudo i{background:var(--warn)}
 @keyframes pulso{70%{box-shadow:0 0 0 8px rgba(63,185,80,0)}100%{box-shadow:0 0 0 0 rgba(63,185,80,0)}}
 
 /* ---------- layout ---------- */
@@ -246,7 +249,7 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
   <button class="btn rec" id="btnEscuchar">● Iniciar escucha <kbd>E</kbd></button>
   <button class="btn pri" id="btnResponder">Responder <kbd>R</kbd></button>
 
-  <div class="estado"><span class="luz" id="luz"></span><span id="txtEstado">Detenido</span></div>
+  <div class="estado"><span class="luz" id="luz"></span><span id="txtEstado">Detenido</span><span class="nivel" id="nivel" title="Nivel de audio que llega a la entrada"><i></i></span></div>
 
   <div class="sep"></div>
 
@@ -565,7 +568,7 @@ code{background:var(--bg3); padding:2px 6px; border-radius:5px; font-size:.88em;
    Todo corre en el navegador. Los datos quedan en localStorage.
    ========================================================================= */
 
-const VERSION = 'v14';   // subir junto con CACHE en sw.js al publicar cambios
+const VERSION = 'v15';   // subir junto con CACHE en sw.js al publicar cambios
 const SDK_URL = './vendor/anthropic.mjs';   // SDK oficial de Anthropic, copia local (ver vendor/LEEME.md)
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -849,6 +852,76 @@ FORMATO — respetalo al pie de la letra, la pantalla lo parsea. Cada alternativ
 const DG_URL = 'wss://api.deepgram.com/v1/listen';
 let dgWs = null, dgCtx = null, dgStream = null, dgNodo = null, dgLatido = null;
 let dgFinales = '', dgEsAcum = '', dgCola = Promise.resolve();
+let dgAbrio = false, dgFallos = 0, dgReintento = null;
+
+/* ---------- medidor de entrada ----------
+   Muestra el nivel que llega al micrófono elegido y el nombre del dispositivo.
+   Si pasan 8 s sin señal mientras se escucha, lo dice: casi siempre es que el
+   audio de la reunión no está saliendo por BlackHole. */
+let medCtx = null, medStream = null, medTimer = null, medUltimoSonido = 0, medMudo = false, medNombre = '';
+const UMBRAL_NIVEL = 0.004;   // ≈ −48 dBFS: por encima hay voz o música; por debajo, silencio o cable suelto
+
+function nombreEntrada(stream){
+  try { const t = stream && stream.getAudioTracks()[0]; return (t && t.label) || ''; } catch(e){ return ''; }
+}
+function textoEscucha(){
+  return 'Escuchando' + (cfg.motor === 'deepgram' ? ' · Deepgram' : '') + (medNombre ? ' · ' + medNombre : '');
+}
+function pintarEscuchando(){
+  if (medMudo) pintarEstado('wait', 'No llega audio por "' + (medNombre || 'la entrada') + '" · revisá Salida → Multi-Output y el micrófono de Chrome');
+  else pintarEstado('on', textoEscucha());
+}
+function registrarNivel(n){
+  const el = $('#nivel'); if (!el) return;
+  el.style.display = 'block';
+  el.firstElementChild.style.width = Math.min(100, Math.round(Math.sqrt(n) * 160)) + '%';
+  if (n > UMBRAL_NIVEL){
+    medUltimoSonido = Date.now();
+    if (medMudo){ medMudo = false; el.classList.remove('mudo'); if (escuchando) pintarEscuchando(); }
+  }
+}
+function vigilarSilencio(){
+  clearInterval(medTimer);
+  medUltimoSonido = Date.now();
+  medTimer = setInterval(() => {
+    if (!escuchando) return;
+    if (!medMudo && Date.now() - medUltimoSonido > 8000 && $('#luz').classList.contains('on')){
+      medMudo = true; $('#nivel').classList.add('mudo');
+      pintarEscuchando();
+    }
+  }, 1000);
+}
+/* Para el motor de Chrome, que no expone su audio: se abre la misma entrada
+   predeterminada solo para medirla. */
+async function iniciarMedidorChrome(){
+  pararMedidor();
+  try {
+    medStream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    medNombre = nombreEntrada(medStream);
+    medCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const an = medCtx.createAnalyser(); an.fftSize = 1024;
+    medCtx.createMediaStreamSource(medStream).connect(an);
+    const buf = new Float32Array(an.fftSize);
+    const leer = () => {
+      if (!medCtx) return;
+      an.getFloatTimeDomainData(buf);
+      let e = 0; for (let i = 0; i < buf.length; i++) e += buf[i]*buf[i];
+      registrarNivel(Math.sqrt(e / buf.length));
+    };
+    medTimer && clearInterval(medTimer);
+    vigilarSilencio();
+    medCtx.__lector = setInterval(leer, 120);
+    if (escuchando && $('#luz').classList.contains('on')) pintarEscuchando();
+  } catch(e){ /* sin permiso o sin dispositivo: el reconocimiento ya avisa por su lado */ }
+}
+function pararMedidor(){
+  clearInterval(medTimer); medTimer = null;
+  try { if (medCtx){ clearInterval(medCtx.__lector); medCtx.close(); } } catch(e){}
+  medCtx = null;
+  try { if (medStream) medStream.getTracks().forEach(t => t.stop()); } catch(e){}
+  medStream = null; medMudo = false; medNombre = '';
+  const el = $('#nivel'); if (el){ el.style.display = 'none'; el.classList.remove('mudo'); el.firstElementChild.style.width = '0'; }
+}
 
 const PCM_WORKLET = `
 class PCM extends AudioWorkletProcessor {
@@ -860,13 +933,21 @@ class PCM extends AudioWorkletProcessor {
        canal distinto: quedarse con el primero perdería una de las dos voces. */
     const largo = canales[0].length;
     const pcm = new Int16Array(largo);
+    let energia = 0;
     for (let i = 0; i < largo; i++){
       let suma = 0;
       for (let c = 0; c < canales.length; c++) suma += canales[c][i] || 0;
       const m = Math.max(-1, Math.min(1, suma / canales.length));
+      energia += m * m;
       pcm[i] = m < 0 ? m * 0x8000 : m * 0x7FFF;
     }
     this.port.postMessage(pcm.buffer, [pcm.buffer]);
+    /* Nivel de la señal, para que la pantalla muestre si llega audio o no. */
+    this.acum = (this.acum || 0) + energia; this.n = (this.n || 0) + largo; this.bloques = (this.bloques || 0) + 1;
+    if (this.bloques >= 8){
+      this.port.postMessage({ nivel: Math.sqrt(this.acum / this.n) });
+      this.acum = 0; this.n = 0; this.bloques = 0;
+    }
     return true;
   }
 }
@@ -899,14 +980,26 @@ function mostrarCampoDeepgram(){
 
 async function iniciarDeepgram(){
   if (!cfg.claveDeepgram) throw new Error('Falta la clave de Deepgram. Cargala en Ajustes.');
+  /* Si es una reconexión, soltar primero el micrófono y el contexto anteriores:
+     antes cada reintento abría otros y se acumulaban. */
+  pararDeepgram();
+  dgAbrio = false;
 
-  dgStream = await navigator.mediaDevices.getUserMedia({
-    audio: Object.assign(
-      { echoCancellation:false, noiseSuppression:false, autoGainControl:false },
-      cfg.dispositivo ? { deviceId: { exact: cfg.dispositivo } } : {})
-  });
+  const base = { echoCancellation:false, noiseSuppression:false, autoGainControl:false };
+  try {
+    dgStream = await navigator.mediaDevices.getUserMedia({
+      audio: Object.assign({}, base, cfg.dispositivo ? { deviceId: { exact: cfg.dispositivo } } : {})
+    });
+  } catch(e){
+    if (!cfg.dispositivo || !/Overconstrained|NotFound|NotReadable/i.test(e.name + ' ' + e.message)) throw e;
+    /* El dispositivo guardado ya no existe (cambió BlackHole, otro perfil…). */
+    dgStream = await navigator.mediaDevices.getUserMedia({ audio: base });
+    avisar('No encuentro el dispositivo de entrada guardado; uso el predeterminado. Elegí BlackHole 2ch de nuevo en Ajustes.', true);
+  }
+  medNombre = nombreEntrada(dgStream);
 
   dgCtx = new (window.AudioContext || window.webkitAudioContext)();
+  try { await dgCtx.resume(); } catch(e){}
   const url = URL.createObjectURL(new Blob([PCM_WORKLET], { type:'application/javascript' }));
   await dgCtx.audioWorklet.addModule(url);
   URL.revokeObjectURL(url);
@@ -930,11 +1023,15 @@ async function iniciarDeepgram(){
   dgFinales = '';
 
   dgWs.onopen = () => {
-    pintarEstado('on', 'Escuchando · Deepgram');
+    dgAbrio = true; dgFallos = 0;
+    vigilarSilencio();
+    pintarEscuchando();
     const fuente = dgCtx.createMediaStreamSource(dgStream);
     dgNodo = new AudioWorkletNode(dgCtx, 'pcm');
+    const ws = dgWs;
     dgNodo.port.onmessage = ev => {
-      if (dgWs && dgWs.readyState === 1) dgWs.send(ev.data);
+      if (ev.data && ev.data.nivel !== undefined){ registrarNivel(ev.data.nivel); return; }
+      if (ws.readyState === 1) ws.send(ev.data);
     };
     fuente.connect(dgNodo);
     /* El worklet no produce salida: no se conecta al destino para no devolver
@@ -964,9 +1061,7 @@ async function iniciarDeepgram(){
     }
   };
 
-  dgWs.onerror = () => {
-    avisar('Se cortó la conexión con Deepgram. Revisá la clave y tu internet.', true);
-  };
+  dgWs.onerror = () => { /* el cierre que sigue decide qué hacer */ };
 
   dgWs.onclose = ev => {
     if (!escuchando) return;
@@ -975,8 +1070,22 @@ async function iniciarDeepgram(){
       avisar('Deepgram rechazó la clave. Revisala en Ajustes.', true);
       return;
     }
-    pintarEstado('wait', 'Reconectando con Deepgram…');
-    setTimeout(() => { if (escuchando) iniciarDeepgram().catch(e => { detenerEscucha(); avisar(e.message, true); }); }, 1200);
+    /* El navegador no muestra el motivo cuando el saludo falla (clave mala,
+       sin crédito, sin internet): llega un 1006 pelado. Si nunca llegó a
+       abrir, se reintenta poco y se dice claro qué pasa. */
+    if (!dgAbrio){
+      dgFallos++;
+      if (dgFallos >= 3){
+        detenerEscucha();
+        avisar('No pude conectar con Deepgram tres veces seguidas: revisá la clave, el crédito de la cuenta y tu internet. Mientras tanto podés pasar el motor a Chrome en Ajustes.', true);
+        return;
+      }
+      pintarEstado('wait', 'Deepgram no responde · reintento ' + dgFallos + ' de 3');
+    } else {
+      pintarEstado('wait', 'Se cortó Deepgram · reconectando…');
+    }
+    clearTimeout(dgReintento);
+    dgReintento = setTimeout(() => { if (escuchando) iniciarDeepgram().catch(e => { detenerEscucha(); avisar(e.message, true); }); }, 1200 * Math.max(1, dgFallos));
   };
 }
 
@@ -1046,6 +1155,7 @@ async function cerrarFraseDG(){
 
 function pararDeepgram(){
   clearInterval(dgLatido); dgLatido = null;
+  clearTimeout(dgReintento); dgReintento = null;
   try { if (dgWs && dgWs.readyState === 1) dgWs.send(JSON.stringify({ type:'CloseStream' })); } catch(e){}
   try { if (dgWs) { dgWs.onclose = null; dgWs.close(); } } catch(e){}
   dgWs = null;
@@ -1083,13 +1193,14 @@ function iniciarEscucha(){
     avisar('Este navegador no reconoce voz. Usá Google Chrome en tu Mac.', true);
     return;
   }
+  iniciarMedidorChrome();
   rec = new SR();
   rec.lang = cfg.idiomaOrigen;
   rec.continuous = true;
   rec.interimResults = true;
   rec.maxAlternatives = 1;
 
-  rec.onstart = () => { arrancando = false; pintarEstado('on', 'Escuchando'); };
+  rec.onstart = () => { arrancando = false; pintarEscuchando(); };
 
   rec.onresult = e => {
     ultimoAudio = Date.now();
@@ -1163,6 +1274,7 @@ function detenerEscucha(){
   clearInterval(vigilanteVoz); vigilanteVoz = null;
   clearInterval(refrescoVoz); refrescoVoz = null;
   pararDeepgram();
+  pararMedidor();
   reiniciarAnticipada();
   vaciarBuffer();
   try { rec && rec.stop(); } catch(e){}

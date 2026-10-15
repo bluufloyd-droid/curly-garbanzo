@@ -140,6 +140,11 @@ Están separadas por comentarios y en este orden:
 4. **Generar mi speech.** Tarda un minuto y queda guardado.
 5. **Audio.** La opción sin instalar nada es dejar que el micrófono levante los parlantes.
    La recomendada, con BlackHole, está paso a paso dentro de Ajustes.
+6. **Comprobar que llega audio.** Al iniciar la escucha, al lado del estado aparece el nombre de la
+   entrada que está usando Chrome (tiene que decir *BlackHole 2ch*) y una barrita verde que se mueve
+   con el sonido. Si pasan 8 segundos sin señal, el estado lo avisa: casi siempre es que la salida del
+   sistema no es el Multi-Output Device o que la pestaña tiene elegido otro micrófono. Para probar sin
+   reunión: `say -v Paulina -r 180 "Cuénteme cómo aseguró el plan mensual"` en Terminal.
 
 ### Durante la entrevista
 
